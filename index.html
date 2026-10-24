@@ -24,6 +24,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hid
   padding-top:calc(env(safe-area-inset-top,0px) + 18px);pointer-events:none;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 #time{font-family:var(--display);font-size:56px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#pop{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;min-height:1em}
 #best{font-size:12px;color:var(--dim);letter-spacing:.08em;font-variant-numeric:tabular-nums}
 .ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
   background:rgba(5,5,7,.55);text-align:center;
@@ -44,14 +45,14 @@ button:active{transform:scale(.97)}
 
 <canvas id="c"></canvas>
 <canvas id="fx"></canvas>
-<div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div></div>
+<div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.06</div>
+<div id="ver">v0.07</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
-  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡으세요. 오른쪽 위 버튼으로 조작 방향을 바꿀 수 있어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
+  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡고, 날아오는 방해물은 눌러서 터뜨리세요. 오른쪽 위 버튼으로 조작 방향을 바꿀 수 있어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
   <button id="go" type="button">시작</button>
   <p style="font-size:12px">화면 회전 잠금을 켜두면 좋아요</p>
 </div>
@@ -59,6 +60,7 @@ button:active{transform:scale(.97)}
   <p>버틴 시간</p>
   <div class="big" id="final">0.0</div>
   <p id="rec"></p>
+  <p id="popres"></p>
   <button id="again" type="button">다시</button>
 </div>
 
@@ -170,6 +172,67 @@ function resize(){
 }
 addEventListener('resize',resize); resize();
 
+// ---------- 방해물 ----------
+const obGeo=new THREE.OctahedronGeometry(.45,0);
+const obMat=new THREE.MeshStandardMaterial({color:0xf4f4f6,roughness:.4,emissive:0x555560});
+const bitGeo=new THREE.TetrahedronGeometry(.14,0);
+let obs=[], bits=[], popped=0, obNext=0;
+function spawnOb(){
+  const a=Math.random()*Math.PI*2, R=16;
+  const m=new THREE.Mesh(obGeo,obMat);
+  m.position.set(top.x+Math.cos(a)*R, top.y+1+Math.random()*2.5, top.z+Math.sin(a)*R);
+  const sp=2.6+Math.random()*1.8+Math.min(t,120)*.012;
+  obs.push({m,sp,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
+  scene.add(m);
+}
+function burst(p,n,col){
+  const mat=new THREE.MeshBasicMaterial({color:col,transparent:true});
+  for(let k=0;k<n;k++){
+    const b=new THREE.Mesh(bitGeo,mat); b.position.copy(p);
+    const v=new THREE.Vector3(Math.random()-.5,Math.random()-.2,Math.random()-.5).normalize().multiplyScalar(3+Math.random()*4);
+    scene.add(b); bits.push({b,v,life:1});
+  }
+}
+function clearObs(){ for(const o of obs) scene.remove(o.m); obs=[]; }
+function updateObs(dt){
+  if(state==='play'&&t>15){
+    obNext-=dt;
+    if(obNext<=0){ spawnOb(); obNext=Math.max(1.4,4.5-t*.012)+Math.random()*2.5; }
+  }
+  const aim=new THREE.Vector3();
+  for(let k=obs.length-1;k>=0;k--){
+    const o=obs[k];
+    aim.set(man.position.x,man.position.y+.6,man.position.z).sub(o.m.position);
+    const d=aim.length();
+    o.m.position.addScaledVector(aim.normalize(),o.sp*dt);
+    o.m.rotation.x+=o.spin.x*dt*3; o.m.rotation.y+=o.spin.y*dt*3;
+    if(d<.8&&state==='play'){
+      // 맞으면 날아온 방향으로 크게 밀림
+      om.x+=aim.x*.55; om.z+=aim.z*.55;
+      burst(o.m.position,10,0xd8181f); scene.remove(o.m); obs.splice(k,1);
+    }
+  }
+  for(let k=bits.length-1;k>=0;k--){
+    const p=bits[k]; p.life-=dt*1.6; p.v.y-=6*dt;
+    p.b.position.addScaledVector(p.v,dt); p.b.material.opacity=Math.max(0,p.life);
+    if(p.life<=0){scene.remove(p.b);bits.splice(k,1);}
+  }
+}
+function tapOb(x,y){
+  // 화면 터치 위치와 가장 가까운 방해물 (넉넉한 판정)
+  let best=null,bd=56;
+  const v=new THREE.Vector3();
+  for(const o of obs){
+    v.copy(o.m.position).project(camera);
+    const sx=(v.x+1)/2*innerWidth, sy=(1-v.y)/2*innerHeight;
+    const d=Math.hypot(sx-x,sy-y); if(d<bd){bd=d;best=o;}
+  }
+  if(!best) return false;
+  burst(best.m.position,14,0xf4f4f6); scene.remove(best.m); obs.splice(obs.indexOf(best),1);
+  popped++; $('pop').textContent=popped?'터뜨림 '+popped:'';
+  return true;
+}
+
 // ---------- 입력 ----------
 let ori=null, base=null, gotOri=false;
 let dir='fwd'; try{dir=localStorage.getItem('pole-dir')||'fwd'}catch(e){}
@@ -182,7 +245,7 @@ const keys={};
 addEventListener('deviceorientation',e=>{
   if(e.beta==null) return; ori={b:e.beta,g:e.gamma}; gotOri=true;
 });
-addEventListener('pointerdown',e=>{if(state!=='play')return;touchStart={x:e.clientX,y:e.clientY};});
+addEventListener('pointerdown',e=>{if(state!=='play')return;if(tapOb(e.clientX,e.clientY))return;touchStart={x:e.clientX,y:e.clientY};});
 addEventListener('pointermove',e=>{if(!touchStart)return;touchVec={x:e.clientX-touchStart.x,y:e.clientY-touchStart.y};});
 addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('pointercancel',()=>{touchStart=null;touchVec={x:0,y:0};});
@@ -223,6 +286,7 @@ async function begin(){
   reset(); state='play';
 }
 function reset(){
+  clearObs(); popped=0; obNext=0; $('pop').textContent='';
   t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(CAM_OFF); camLook.copy(top).add(LOOK_OFF);
@@ -230,7 +294,7 @@ function reset(){
 $('go').onclick=begin; $('again').onclick=begin;
 
 function gameOver(){
-  state='fall';
+  state='fall'; clearObs();
   const d=Math.hypot(th.x,th.z)||1;
   fall={vx:th.x/d*4+om.x*SWAY*.5,vz:th.z/d*4+om.z*SWAY*.5,vy:1,ry:0,time:0};
 }
@@ -238,6 +302,7 @@ function showResult(){
   state='over'; $('over').style.display='';
   const isBest=t>best; if(isBest){best=t;try{localStorage.setItem('pole-best',best)}catch(e){}}
   $('final').textContent=t.toFixed(1);
+  $('popres').textContent=popped?'방해물 '+popped+'개 터뜨림':'';
   $('rec').textContent=isBest?'새 기록':'최고 '+best.toFixed(1)+'초';
   $('best').textContent='최고 '+best.toFixed(1)+'초';
   $('over').hidden=false;
@@ -250,6 +315,7 @@ function step(now){
   if(state==='play') physics(dt);
   else if(state==='fall') falling(dt);
   else idle(now/1000);
+  updateObs(dt);
   draw(dt);
   requestAnimationFrame(step);
 }
