@@ -37,6 +37,7 @@ button{font:inherit;font-family:var(--display);font-size:20px;color:var(--bg);ba
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 button:active{transform:scale(.97)}
 #ver{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;pointer-events:none;z-index:5}
+#dir{position:fixed;right:max(14px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 18px);z-index:20;font-family:var(--body);font-size:12px;font-weight:600;color:var(--fg);background:rgba(244,244,246,.12);border:1px solid var(--faint);padding:8px 12px}
 #mode{position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:12px;color:var(--dim);pointer-events:none;
   padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 </style>
@@ -44,12 +45,13 @@ button:active{transform:scale(.97)}
 <canvas id="c"></canvas>
 <canvas id="fx"></canvas>
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div></div>
+<button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.03</div>
+<div id="ver">v0.04</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
-  <p>폰을 쟁반처럼 들고, 장대가 휘청이는 반대쪽으로 천천히 기울여 균형을 잡으세요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
+  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡으세요. 오른쪽 위 버튼으로 조작 방향을 바꿀 수 있어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
   <button id="go" type="button">시작</button>
   <p style="font-size:12px">화면 회전 잠금을 켜두면 좋아요</p>
 </div>
@@ -170,6 +172,11 @@ addEventListener('resize',resize); resize();
 
 // ---------- 입력 ----------
 let ori=null, base=null, gotOri=false;
+let dir='rev'; try{dir=localStorage.getItem('pole-dir')||'rev'}catch(e){}
+function showDir(){$('dir').textContent=dir==='fwd'?'순방향 · 기울인 쪽으로':'역방향 · 기울인 반대쪽으로';}
+$('dir').addEventListener('pointerdown',e=>e.stopPropagation());
+$('dir').onclick=()=>{dir=dir==='fwd'?'rev':'fwd';try{localStorage.setItem('pole-dir',dir)}catch(e){}showDir();};
+showDir();
 let touchStart=null, touchVec={x:0,y:0};
 const keys={};
 addEventListener('deviceorientation',e=>{
@@ -187,7 +194,8 @@ function readTilt(){
   if(gotOri&&ori&&base){
     let gx=(ori.g-base.g), bz=(ori.b-base.b);
     const d=Math.PI/180;
-    return {x:clamp(-gx*d,-MAXT,MAXT), z:clamp(-bz*d,-MAXT,MAXT)};
+    const sg=dir==='fwd'?1:-1;
+    return {x:clamp(sg*gx*d,-MAXT,MAXT), z:clamp(sg*bz*d,-MAXT,MAXT)};
   }
   let x=0,z=0;
   if(touchStart){x=touchVec.x/110*MAXT; z=touchVec.y/110*MAXT;}
@@ -250,14 +258,7 @@ function physics(dt){
   const k=.45+Math.min(t,120)*.006;            // 휘청이는 힘, 천천히 강해짐
   const c=1.9, damp=.55;
   const phi=readTilt();
-  wind.next-=dt;
-  if(wind.next<=0&&wind.left<=0){
-    const a=Math.random()*Math.PI*2, w=.22+Math.min(t,120)*.003;
-    wind={x:Math.cos(a)*w,z:Math.sin(a)*w,left:1.5+Math.random()*1.5,next:0};
-  }
-  let wx=0,wz=0;
-  if(wind.left>0){wind.left-=dt;wx=wind.x;wz=wind.z;if(wind.left<=0)wind.next=3+Math.random()*4;
-    if(Math.random()<.35)streaks.push({x:wind.x>0?-40:innerWidth+40,y:Math.random()*innerHeight,dx:Math.sign(wind.x)||1,dy:wind.z*.15,l:40+Math.random()*60,life:1});}
+  const wx=0,wz=0;
   for(const a of ['x','z']){
     const acc=k*th[a]*(1+th[a]*th[a]) + c*phi[a] + (a==='x'?wx:wz) + (Math.random()-.5)*.06 - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
