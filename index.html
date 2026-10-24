@@ -47,7 +47,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.05</div>
+<div id="ver">v0.06</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -224,7 +224,7 @@ async function begin(){
 }
 function reset(){
   t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
-  wind={x:0,z:0,left:0,next:2.5+Math.random()*2}; fall=null; streaks=[];
+  wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(CAM_OFF); camLook.copy(top).add(LOOK_OFF);
 }
 $('go').onclick=begin; $('again').onclick=begin;
@@ -259,7 +259,20 @@ function physics(dt){
   const c=2.6, damp=.55;                        // 최대 기울이면 한계에서도 항상 되돌릴 수 있음
   const jit=.06+Math.min(t,120)*.0008;         // 대신 잔흔들림이 늘어남
   const phi=readTilt();
-  const wx=0,wz=0;
+  // 바람: 10초 이후, 세기·길이 랜덤
+  let wx=0,wz=0;
+  if(t>10){
+    wind.next-=dt;
+    if(wind.next<=0&&wind.left<=0){
+      const a=Math.random()*Math.PI*2, w=.1+Math.random()*.35;
+      wind={x:Math.cos(a)*w,z:Math.sin(a)*w,w,left:1+Math.random()*4,next:0};
+    }
+    if(wind.left>0){
+      wind.left-=dt; wx=wind.x; wz=wind.z;
+      if(wind.left<=0) wind.next=3+Math.random()*4;
+      if(Math.random()<wind.w*1.6) streaks.push({x:wind.x>0?-40:innerWidth+40,y:Math.random()*innerHeight,dx:Math.sign(wind.x)||1,dy:wind.z/wind.w*.25,l:30+wind.w*200,life:1,a:.15+wind.w});
+    }
+  }
   for(const a of ['x','z']){
     const acc=k*th[a]*(1+th[a]*th[a]) + c*phi[a] + (a==='x'?wx:wz) + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
@@ -309,7 +322,7 @@ function draw(){
   streaks=streaks.filter(s=>s.life>0);
   for(const s of streaks){
     s.x+=s.dx*18; s.y+=s.dy*18; s.life-=.02;
-    g2.strokeStyle='rgba(255,255,255,'+(.35*s.life)+')';
+    g2.strokeStyle='rgba(255,255,255,'+((s.a||.35)*s.life)+')';
     g2.beginPath(); g2.moveTo(s.x,s.y); g2.lineTo(s.x-s.dx*s.l,s.y-s.dy*s.l); g2.stroke();
   }
 }
