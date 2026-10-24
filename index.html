@@ -45,7 +45,7 @@ button:active{transform:scale(.97)}
 <canvas id="fx"></canvas>
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div></div>
 <div id="mode"></div>
-<div id="ver">v0.01</div>
+<div id="ver">v0.02</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -164,7 +164,7 @@ function readTilt(){
   if(gotOri&&ori&&base){
     let gx=(ori.g-base.g), bz=(ori.b-base.b);
     const d=Math.PI/180;
-    return {x:clamp(gx*d,-MAXT,MAXT), z:clamp(bz*d,-MAXT,MAXT)};
+    return {x:clamp(-gx*d,-MAXT,MAXT), z:clamp(-bz*d,-MAXT,MAXT)};
   }
   let x=0,z=0;
   if(touchStart){x=touchVec.x/110*MAXT; z=touchVec.y/110*MAXT;}
