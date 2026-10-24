@@ -36,6 +36,7 @@ button{font:inherit;font-family:var(--display);font-size:20px;color:var(--bg);ba
   border-radius:999px;padding:14px 44px;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 button:active{transform:scale(.97)}
+#ver{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;pointer-events:none;z-index:5}
 #mode{position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:12px;color:var(--dim);pointer-events:none;
   padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 </style>
@@ -44,6 +45,7 @@ button:active{transform:scale(.97)}
 <canvas id="fx"></canvas>
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div></div>
 <div id="mode"></div>
+<div id="ver">v0.01</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -179,6 +181,8 @@ let best=0; try{best=+localStorage.getItem('pole-best')||0}catch(e){}
 $('best').textContent='최고 '+best.toFixed(1)+'초';
 
 async function begin(){
+  $('start').hidden=true; $('over').hidden=true;
+  $('start').style.display='none'; $('over').style.display='none';
   try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission)
         await DeviceOrientationEvent.requestPermission(); }catch(e){}
   try{ wake=await navigator.wakeLock.request('screen'); }catch(e){}
@@ -186,7 +190,6 @@ async function begin(){
     $('mode').textContent=gotOri?'기울기 조작':'기울기 센서 없음 · 손가락 드래그로 조작';
   },250);
   reset(); state='play';
-  $('start').hidden=true; $('over').hidden=true;
 }
 function reset(){
   t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
@@ -201,7 +204,7 @@ function gameOver(){
   fall={vx:th.x/d*3,vz:th.z/d*3,vy:1.5,ry:0,time:0};
 }
 function showResult(){
-  state='over';
+  state='over'; $('over').style.display='';
   const isBest=t>best; if(isBest){best=t;try{localStorage.setItem('pole-best',best)}catch(e){}}
   $('final').textContent=t.toFixed(1);
   $('rec').textContent=isBest?'새 기록':'최고 '+best.toFixed(1)+'초';
