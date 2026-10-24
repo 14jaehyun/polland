@@ -47,7 +47,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.04</div>
+<div id="ver">v0.05</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -172,7 +172,7 @@ addEventListener('resize',resize); resize();
 
 // ---------- 입력 ----------
 let ori=null, base=null, gotOri=false;
-let dir='rev'; try{dir=localStorage.getItem('pole-dir')||'rev'}catch(e){}
+let dir='fwd'; try{dir=localStorage.getItem('pole-dir')||'fwd'}catch(e){}
 function showDir(){$('dir').textContent=dir==='fwd'?'순방향 · 기울인 쪽으로':'역방향 · 기울인 반대쪽으로';}
 $('dir').addEventListener('pointerdown',e=>e.stopPropagation());
 $('dir').onclick=()=>{dir=dir==='fwd'?'rev':'fwd';try{localStorage.setItem('pole-dir',dir)}catch(e){}showDir();};
@@ -255,12 +255,13 @@ function step(now){
 }
 function physics(dt){
   t+=dt;
-  const k=.45+Math.min(t,120)*.006;            // 휘청이는 힘, 천천히 강해짐
-  const c=1.9, damp=.55;
+  const k=.45+Math.min(t,120)*.0013;           // 휘청이는 힘, 아주 천천히 강해짐 (최대 .6)
+  const c=2.6, damp=.55;                        // 최대 기울이면 한계에서도 항상 되돌릴 수 있음
+  const jit=.06+Math.min(t,120)*.0008;         // 대신 잔흔들림이 늘어남
   const phi=readTilt();
   const wx=0,wz=0;
   for(const a of ['x','z']){
-    const acc=k*th[a]*(1+th[a]*th[a]) + c*phi[a] + (a==='x'?wx:wz) + (Math.random()-.5)*.06 - damp*om[a];
+    const acc=k*th[a]*(1+th[a]*th[a]) + c*phi[a] + (a==='x'?wx:wz) + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
   }
   if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
