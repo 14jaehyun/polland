@@ -58,7 +58,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.14</div>
+<div id="ver">v0.15</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -92,14 +92,14 @@ camera.up.set(0,0,-1);
 const camPos=new THREE.Vector3(0,TOP+10,0);
 // 시점: 1 = 수직으로 내려다봄, 2 = 더 높은 곳에서 대각선으로. 장대 끝은 항상 화면 좌 2/3, 위 2/3
 // shift: 소실점을 화면 중앙보다 얼마나 아래로 내릴지(화면 높이 비율)
-const VIEWS={1:{pitch:90,yaw:0,shift:.42,dist:13,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,fovP:74,fovL:60}};
+const VIEWS={1:{pitch:90,yaw:0,shift:.32,dist:9,ms:1.9,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,ms:1,fovP:74,fovL:60}};
 let view='2'; try{view=localStorage.getItem('pole-view')||'2'}catch(e){}
 const camOffset=new THREE.Vector3(), camQuat=new THREE.Quaternion();
 const scrR=new THREE.Vector3(1,0,0), scrD=new THREE.Vector3(0,0,1); // 화면 오른쪽·아래쪽이 땅 위에서 가리키는 방향
 let cv=null;
 function viewTarget(){
   const v=VIEWS[view], fov=innerWidth/innerHeight<.75?v.fovP:v.fovL;
-  return {pitch:v.pitch,yaw:v.yaw,shift:v.shift,dist:v.dist,fov};
+  return {pitch:v.pitch,yaw:v.yaw,shift:v.shift,dist:v.dist,ms:v.ms,fov};   // ms: 캐릭터 크기
 }
 function applyView(){
   const D=Math.PI/180;
@@ -173,7 +173,7 @@ function buildMongkok(){
   MATS.push(['#86a5e0','#33508f','#a3bdee','#a3bdee','#6a8bcc','#2b4480'].map(c=>new THREE.MeshBasicMaterial({color:c}))); // 옥상 잡동사니
   const CLUT=MATS.length-1;
   MATS.forEach(a=>a.forEach(m=>m.vertexColors=true));
-  const shadeAt=y=>.15+.85*Math.min(1,Math.max(0,y)/250);   // 바닥 15% → 높이 250부터 100% 밝기
+  const shadeAt=y=>1;   // 높이별 어둡게 하기 없음 (시안처럼 아래까지 또렷하게)
 
   // 건물은 재질·면별로 한 덩어리로 합쳐서 그리기 호출을 줄임
   const buckets={}, edgePos=[];
@@ -235,7 +235,7 @@ function buildMongkok(){
   signs.forEach((s,i)=>{o.position.set(s.x,s.y,s.z);o.scale.set(s.sx,s.sy,s.sz);o.updateMatrix();sm.setMatrixAt(i,o.matrix);sm.setColorAt(i,SIGNC[(R()*SIGNC.length)|0].clone().multiplyScalar(Math.min(1,shadeAt(s.y)+.2)))});
   cityGroup.add(sm);
 
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshBasicMaterial({color:0x2a140e}));
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshBasicMaterial({color:0x6a2f1e}));
   ground.rotation.x=-Math.PI/2;ground.position.z=-150;cityGroup.add(ground);
   const roadTex=canvasTex(64,256,(g,w,h)=>{
     const gr=g.createLinearGradient(0,0,w,0);
@@ -248,8 +248,8 @@ function buildMongkok(){
   function road(len,width,rotY,cx,cz){
     const t=roadTex.clone();t.needsUpdate=true;t.repeat.set(1,len/70);
     const g=new THREE.PlaneGeometry(width,len);g.rotateX(-Math.PI/2);if(rotY)g.rotateY(rotY);
-    const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:t,color:0x6a6a6a}));  // 거리는 어둡게, 불빛만 희미하게m.position.set(cx,.15,cz);cityGroup.add(m);
-    const gl=new THREE.Mesh(g.clone(),new THREE.MeshBasicMaterial({color:0xff7a30,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:t}));m.position.set(cx,.15,cz);cityGroup.add(m);
+    const gl=new THREE.Mesh(g.clone(),new THREE.MeshBasicMaterial({color:0xff7a30,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
     gl.scale.set(rotY?1:1.6,1,rotY?1.6:1);gl.position.set(cx,4,cz);cityGroup.add(gl);
   }
   road(820,ROAD_X*2+4,0,0,-140);
@@ -349,11 +349,11 @@ function updateObs(dt){
   const aim=new THREE.Vector3();
   for(let k=obs.length-1;k>=0;k--){
     const o=obs[k];
-    aim.set(man.position.x,man.position.y+.6,man.position.z).sub(o.m.position);
+    aim.set(man.position.x,man.position.y+.6*man.scale.x,man.position.z).sub(o.m.position);
     const d=aim.length();
     o.m.position.addScaledVector(aim.normalize(),o.sp*dt);
     o.m.rotation.x+=o.spin.x*dt*3; o.m.rotation.y+=o.spin.y*dt*3;
-    if(d<.8&&state==='play'){
+    if(d<.8*man.scale.x&&state==='play'){
       // 맞으면 날아온 방향으로 크게 밀림
       om.x+=aim.x*.55; om.z+=aim.z*.55;
       burst(o.m.position,10,0xd8181f); scene.remove(o.m); obs.splice(k,1);
@@ -505,6 +505,7 @@ function followCam(dt){
   const T=viewTarget(), b=Math.min(1,dt*2.2);
   for(const key in T) cv[key]+=(T[key]-cv[key])*b;
   applyView();
+  man.scale.setScalar(cv.ms);   // 수직 시점은 시안처럼 캐릭터를 크게(타이트하게)
   // 장대가 기운 만큼 카메라도 같이 기울어서 건물들이 시점째 휘청임 (꼭대기 기준으로 회전)
   eT.set(tilt.z,0,-tilt.x); qT.setFromEuler(eT);
   offR.copy(camOffset).applyQuaternion(qT);
