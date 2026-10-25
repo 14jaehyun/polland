@@ -58,7 +58,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.16</div>
+<div id="ver">v0.17</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -78,7 +78,7 @@ button:active{transform:scale(.97)}
 <script>
 (function(){
 const TOP=200;               // 장대 높이
-const LIMIT=1;               // 흔들림 한계(1 = 꼭대기가 SWAY만큼 밀림)
+const LIMIT=2.2;             // 흔들림 한계: 2.2 = 꼭대기가 SWAY의 2.2배 밀림 ≈ 10°
 const $=id=>document.getElementById(id);
 
 // ---------- 렌더러 / 씬 ----------
@@ -397,7 +397,7 @@ addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('pointercancel',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('keydown',e=>keys[e.key]=true); addEventListener('keyup',e=>keys[e.key]=false);
 
-const MAXT=0.55; // 최대 기울기 입력(rad)
+const MAXT=0.75; // 최대 기울기 입력(rad) — 작은 기울기 반응은 그대로, 끝까지 기울이면 더 세게 되돌림
 function readTilt(){
   // 반환: 쟁반 기울기 φ (x: 오른쪽 내려감 +, z: 화면 아래쪽 내려감 +)
   if(gotOri&&ori&&base){
@@ -468,7 +468,7 @@ function step(now){
 function physics(dt){
   t+=dt;
   const k=.45+Math.min(t,120)*.0013;           // 휘청이는 힘, 아주 천천히 강해짐 (최대 .6)
-  const c=2.6, damp=.55;                        // 최대 기울이면 한계에서도 항상 되돌릴 수 있음
+  const c=3.2, damp=.55;                        // 되돌리는 힘 최대 3.2×.75=2.4 > 10°에서 쓰러지려는 힘 최대 2.1 → 어느 각도든 원복 가능, 떨어지는 건 반동 때문
   const jit=.06+Math.min(t,120)*.0008;         // 대신 잔흔들림이 늘어남
   const phi=readTilt();
   // 바람: 10초 이후, 세기·길이 랜덤
@@ -489,7 +489,7 @@ function physics(dt){
   const sx=c*phi.x+wx, sz=c*phi.z+wz;
   const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
   for(const a of ['x','z']){
-    const acc=k*th[a]*(1+th[a]*th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
+    const acc=k*th[a]*(1+.12*th[a]*th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
   }
   if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
