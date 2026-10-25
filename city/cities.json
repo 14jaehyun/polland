@@ -1,14 +1,18 @@
 [
  {
-  "id": "shinjuku",
-  "name": "Shinjuku"
+  "id": "mongkok",
+  "name": "Mong Kok"
+ },
+ {
+  "id": "chongqing",
+  "name": "Chongqing"
  },
  {
   "id": "seoul",
   "name": "Seoul"
  },
  {
-  "id": "mongkok",
-  "name": "Mong Kok"
+  "id": "shinjuku",
+  "name": "Shinjuku"
  }
 ]
