@@ -48,7 +48,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.09</div>
+<div id="ver">v0.10</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -486,15 +486,22 @@ function physics(dt){
   followCam(dt);
 }
 function placeMan(){ man.position.copy(top); man.rotation.set(tilt.z,0,-tilt.x); }
+const qT=new THREE.Quaternion(), eT=new THREE.Euler(), offR=new THREE.Vector3(), scrP=new THREE.Vector3();
 function followCam(dt){
   // 카메라가 꼭대기를 늦게 따라가서 휘청임이 화면에 보이게
   // 시점 전환은 1~2초에 걸쳐 고개를 돌리듯
   const T=viewTarget(), b=Math.min(1,dt*2.2);
   for(const key in T) cv[key]+=(T[key]-cv[key])*b;
   applyView();
-  const r=Math.min(1,dt*1.2);
-  camPos.lerp(top.clone().add(camOffset),r);
-  camera.position.copy(camPos); camera.quaternion.copy(camQuat);
+  // 장대가 기운 만큼 카메라도 같이 기울어서 건물들이 시점째 휘청임 (꼭대기 기준으로 회전)
+  eT.set(tilt.z,0,-tilt.x); qT.setFromEuler(eT);
+  offR.copy(camOffset).applyQuaternion(qT);
+  // 캐릭터가 화면 밖으로 나가려 하면 빨리 따라감
+  scrP.set(man.position.x,man.position.y+.5,man.position.z).project(camera);
+  const out=Math.abs(scrP.x)>.85||Math.abs(scrP.y)>.85||scrP.z>1;
+  const r=Math.min(1,dt*(out?6:1.2));
+  camPos.lerp(top.clone().add(offR),r);
+  camera.position.copy(camPos); camera.quaternion.copy(qT).multiply(camQuat);
 }
 function pose(flail){
   const v=Math.hypot(om.x,om.z), lean=Math.hypot(th.x,th.z);
