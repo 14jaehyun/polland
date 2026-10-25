@@ -13,7 +13,7 @@ from PIL import Image
 
 ap = argparse.ArgumentParser()
 ap.add_argument('img'); ap.add_argument('id'); ap.add_argument('name'); ap.add_argument('sub')
-ap.add_argument('--adj', type=float, default=0); ap.add_argument('--model', default='/tmp/claude-0/da/vits.onnx')
+ap.add_argument('--adj', type=float, default=0); ap.add_argument('--limit', type=float, default=10); ap.add_argument('--model', default='/tmp/claude-0/da/vits.onnx')
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'city'))
 a = ap.parse_args()
 
@@ -55,7 +55,7 @@ print('up', up.round(4))
 os.makedirs(a.out, exist_ok=True)
 im.save(os.path.join(a.out, a.id + '.jpg'), 'JPEG', quality=90)
 json.dump({'id': a.id, 'name': a.name, 'sub': a.sub, 'nx': NX, 'ny': NY, 'vd': base64.b64encode(vd.tobytes()).decode(),
-           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'frame': [U0, UW, V0, VH]},
+           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH]},
           open(os.path.join(a.out, a.id + '.json'), 'w'))
 lp = os.path.join(a.out, 'cities.json')
 L = json.load(open(lp)) if os.path.exists(lp) else []

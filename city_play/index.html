@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.21 · city_play · 보이는 흔들림 3배</div>
+<div id="ver">v0.22 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -86,7 +86,9 @@ button:active{transform:scale(.97)}
 <script>
 function START(CD){
 const TOP=320;               // 장대 높이 (도시 시안과 같은 단위, 화면 표시 320m)
-const LIMIT=2.2;             // 흔들림 한계: 2.2 = 꼭대기가 SWAY의 2.2배 밀림 ≈ 10°
+const LIMIT_DEG=CD.limitDeg||10, LIMIT=Math.tan(LIMIT_DEG*Math.PI/180)*320/25.6;   // 떨어지는 각도 (도시별, 기본 10° = 2.2)
+// 쓰러지려는 힘: 10°(2.2)까지는 예전 그대로, 그 너머는 아주 완만하게만 늘어서 한도를 넓힌 도시도 어느 각도든 원복 가능
+function fallF(x){const a=Math.abs(x);return Math.sign(x)*(a<=2.2?a*(1+.12*a*a):3.4848+.2*(a-2.2));}
 const $=id=>document.getElementById(id);
 
 // ---------- 렌더러 / 씬 ----------
@@ -430,7 +432,7 @@ function physics(dt){
   const sx=c*phi.x+wx, sz=c*phi.z+wz;
   const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
   for(const a of ['x','z']){
-    const acc=k*th[a]*(1+.12*th[a]*th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
+    const acc=k*fallF(th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
   }
   if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
@@ -445,7 +447,9 @@ const VIS=3;
 function followCam(dt){
   // 카메라는 쉬는 자리에 고정, 판만 축 PV를 중심으로 장대 기울기의 반대로 회전
   camera.position.copy(top).add(camOffset); camera.quaternion.copy(camQuat);
-  eT.set(tilt.z*VIS,0,-tilt.x*VIS); qT.setFromEuler(eT); PG.quaternion.copy(qT).invert();   // 보이는 회전만 VIS배 (물리는 그대로)
+  // 보이는 회전: 10°까지는 VIS배, 그 너머(한도를 넓힌 도시)는 1배씩만 더해서 화면이 너무 돌지 않게
+  const tm=Math.hypot(tilt.x,tilt.z), T10=10*Math.PI/180, vm=tm<=T10?tm*VIS:T10*VIS+(tm-T10), sc=tm>1e-6?vm/tm:VIS;
+  eT.set(tilt.z*sc,0,-tilt.x*sc); qT.setFromEuler(eT); PG.quaternion.copy(qT).invert();   // 보이는 회전만 VIS배 (물리는 그대로)
 }
 function pose(flail){
   // 흔들리면 몸을 반대로 살짝 기울여 버팀
