@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.20 · city_play</div>
+<div id="ver">v0.21 · city_play · 보이는 흔들림 3배</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -441,10 +441,11 @@ function physics(dt){
 function placeMan(){ man.position.set(0,TOP,0).add(new THREE.Vector3(0,CAP,0).applyQuaternion(qA)); man.quaternion.copy(qA); }
 const qT=new THREE.Quaternion(), eT=new THREE.Euler(), offR=new THREE.Vector3(), scrP=new THREE.Vector3();
 const qI=new THREE.Quaternion(), qV=new THREE.Quaternion();
+const VIS=3;
 function followCam(dt){
   // 카메라는 쉬는 자리에 고정, 판만 축 PV를 중심으로 장대 기울기의 반대로 회전
   camera.position.copy(top).add(camOffset); camera.quaternion.copy(camQuat);
-  eT.set(tilt.z,0,-tilt.x); qT.setFromEuler(eT); PG.quaternion.copy(qT).invert();
+  eT.set(tilt.z*VIS,0,-tilt.x*VIS); qT.setFromEuler(eT); PG.quaternion.copy(qT).invert();   // 보이는 회전만 VIS배 (물리는 그대로)
 }
 function pose(flail){
   // 흔들리면 몸을 반대로 살짝 기울여 버팀
