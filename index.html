@@ -58,7 +58,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.15</div>
+<div id="ver">v0.16</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -92,14 +92,14 @@ camera.up.set(0,0,-1);
 const camPos=new THREE.Vector3(0,TOP+10,0);
 // 시점: 1 = 수직으로 내려다봄, 2 = 더 높은 곳에서 대각선으로. 장대 끝은 항상 화면 좌 2/3, 위 2/3
 // shift: 소실점을 화면 중앙보다 얼마나 아래로 내릴지(화면 높이 비율)
-const VIEWS={1:{pitch:90,yaw:0,shift:.32,dist:9,ms:1.9,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,ms:1,fovP:74,fovL:60}};
+const VIEWS={1:{pitch:90,yaw:0,shift:.32,dist:9,ms:1.9,cap:.5,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,ms:1,cap:1,fovP:74,fovL:60}};
 let view='2'; try{view=localStorage.getItem('pole-view')||'2'}catch(e){}
 const camOffset=new THREE.Vector3(), camQuat=new THREE.Quaternion();
 const scrR=new THREE.Vector3(1,0,0), scrD=new THREE.Vector3(0,0,1); // 화면 오른쪽·아래쪽이 땅 위에서 가리키는 방향
 let cv=null;
 function viewTarget(){
   const v=VIEWS[view], fov=innerWidth/innerHeight<.75?v.fovP:v.fovL;
-  return {pitch:v.pitch,yaw:v.yaw,shift:v.shift,dist:v.dist,ms:v.ms,fov};   // ms: 캐릭터 크기
+  return {pitch:v.pitch,yaw:v.yaw,shift:v.shift,dist:v.dist,ms:v.ms,cap:v.cap,fov};   // ms: 캐릭터 크기
 }
 function applyView(){
   const D=Math.PI/180;
@@ -505,7 +505,8 @@ function followCam(dt){
   const T=viewTarget(), b=Math.min(1,dt*2.2);
   for(const key in T) cv[key]+=(T[key]-cv[key])*b;
   applyView();
-  man.scale.setScalar(cv.ms);   // 수직 시점은 시안처럼 캐릭터를 크게(타이트하게)
+  man.scale.setScalar(cv.ms);
+  capM.material.color.setHex(0xbfc9e6).multiplyScalar(cv.cap);   // 수직 시점은 상면을 시안처럼 어둡게   // 수직 시점은 시안처럼 캐릭터를 크게(타이트하게)
   // 장대가 기운 만큼 카메라도 같이 기울어서 건물들이 시점째 휘청임 (꼭대기 기준으로 회전)
   eT.set(tilt.z,0,-tilt.x); qT.setFromEuler(eT);
   offR.copy(camOffset).applyQuaternion(qT);
