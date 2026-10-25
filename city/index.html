@@ -489,7 +489,7 @@ requestAnimationFrame(step);
   const sel=document.getElementById('city');
   for(const c of list){const o=document.createElement('option');o.value=c.id;o.textContent=c.name;if(c.id===id)o.selected=true;sel.appendChild(o);}
   sel.onchange=()=>{location.search='?c='+sel.value;};
-  const CD=await (await fetch(id+'.json',{cache:'no-cache'})).json(); CD.img=id+'.jpg';
+  const CD=await (await fetch(id+'.json',{cache:'no-cache'})).json(); CD.img=id+'.jpg'+'?v='+(CD.ver||Date.now());   // 그림이 바뀌면 새로 받게
   document.title=CD.name+' · 장대 위에서'; document.getElementById('cname').textContent=CD.name; document.getElementById('csub').textContent=CD.sub;
   START(CD);
 })();

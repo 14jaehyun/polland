@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.24 · city_play</div>
+<div id="ver">v0.25 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -493,7 +493,7 @@ requestAnimationFrame(step);
   for(const c of list){const o=document.createElement('option');o.value=c.id;o.textContent=c.name;if(c.id===id)o.selected=true;sel.appendChild(o);}
   sel.onchange=()=>{location.search='?c='+sel.value;};
   sel.addEventListener('pointerdown',e=>e.stopPropagation());
-  const CD=await (await fetch('../city/'+id+'.json',{cache:'no-cache'})).json(); CD.img='../city/'+id+'.jpg';
+  const CD=await (await fetch('../city/'+id+'.json',{cache:'no-cache'})).json(); CD.img='../city/'+id+'.jpg'+'?v='+(CD.ver||Date.now());   // 그림이 바뀌면 새로 받게
   document.title=CD.name+' · 장대 위에서 버티기'; document.getElementById('cname').textContent=CD.name; document.getElementById('csub').textContent=CD.sub;
   START(CD);
 })();

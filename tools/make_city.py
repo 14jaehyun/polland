@@ -54,8 +54,9 @@ print('up', up.round(4))
 
 os.makedirs(a.out, exist_ok=True)
 im.save(os.path.join(a.out, a.id + '.jpg'), 'JPEG', quality=90)
+import hashlib; ver = hashlib.md5(open(os.path.join(a.out, a.id + '.jpg'), 'rb').read()).hexdigest()[:8]   # 그림이 바뀌면 브라우저가 새로 받게
 json.dump({'id': a.id, 'name': a.name, 'sub': a.sub, 'nx': NX, 'ny': NY, 'vd': base64.b64encode(vd.tobytes()).decode(),
-           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH]},
+           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'ver': ver, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH]},
           open(os.path.join(a.out, a.id + '.json'), 'w'))
 lp = os.path.join(a.out, 'cities.json')
 L = json.load(open(lp)) if os.path.exists(lp) else []
