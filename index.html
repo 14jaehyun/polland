@@ -48,7 +48,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.12</div>
+<div id="ver">v0.13</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -162,6 +162,8 @@ function buildMongkok(){
   });
   MATS.push(['#86a5e0','#33508f','#a3bdee','#a3bdee','#6a8bcc','#2b4480'].map(c=>new THREE.MeshBasicMaterial({color:c}))); // 옥상 잡동사니
   const CLUT=MATS.length-1;
+  MATS.forEach(a=>a.forEach(m=>m.vertexColors=true));
+  const shadeAt=y=>.38+.62*Math.min(1,Math.max(0,y)/250);   // 바닥 38% → 높이 250부터 100% 밝기
 
   // 건물은 재질·면별로 한 덩어리로 합쳐서 그리기 호출을 줄임
   const buckets={}, edgePos=[];
@@ -173,8 +175,8 @@ function buildMongkok(){
     g.translate(x,y+h/2,z);
     const P=g.attributes.position.array,U=g.attributes.uv.array,I=g.index.array;
     for(let f=0;f<6;f++){
-      const b=buckets[mi+'_'+f]||(buckets[mi+'_'+f]={mi,f,p:[],u:[]});
-      for(let j=0;j<6;j++){const k=I[f*6+j];b.p.push(P[k*3],P[k*3+1],P[k*3+2]);b.u.push(U[k*2],U[k*2+1])}
+      const b=buckets[mi+'_'+f]||(buckets[mi+'_'+f]={mi,f,p:[],u:[],c:[]});
+      for(let j=0;j<6;j++){const k=I[f*6+j],v=shadeAt(P[k*3+1]);b.p.push(P[k*3],P[k*3+1],P[k*3+2]);b.u.push(U[k*2],U[k*2+1]);b.c.push(v,v,v)}
     }
     const e=new THREE.EdgesGeometry(g),ep=e.attributes.position.array;
     for(let i=0;i<ep.length;i++)edgePos.push(ep[i]);
@@ -211,6 +213,7 @@ function buildMongkok(){
     const b=buckets[key],g=new THREE.BufferGeometry();
     g.setAttribute('position',new THREE.Float32BufferAttribute(b.p,3));
     g.setAttribute('uv',new THREE.Float32BufferAttribute(b.u,2));
+    g.setAttribute('color',new THREE.Float32BufferAttribute(b.c,3));
     cityGroup.add(new THREE.Mesh(g,MATS[b.mi][b.f]));
   }
   const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute(edgePos,3));
@@ -219,10 +222,10 @@ function buildMongkok(){
   const SIGNC=['#ff7a33','#ff4d3d','#ffd08a','#ff9a4a','#ffe6c2','#ff5f2e'].map(c=>new THREE.Color(c));
   const sm=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0xffffff}),signs.length);
   const o=new THREE.Object3D();
-  signs.forEach((s,i)=>{o.position.set(s.x,s.y,s.z);o.scale.set(s.sx,s.sy,s.sz);o.updateMatrix();sm.setMatrixAt(i,o.matrix);sm.setColorAt(i,SIGNC[(R()*SIGNC.length)|0])});
+  signs.forEach((s,i)=>{o.position.set(s.x,s.y,s.z);o.scale.set(s.sx,s.sy,s.sz);o.updateMatrix();sm.setMatrixAt(i,o.matrix);sm.setColorAt(i,SIGNC[(R()*SIGNC.length)|0].clone().multiplyScalar(Math.min(1,shadeAt(s.y)+.2)))});
   cityGroup.add(sm);
 
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshBasicMaterial({color:0x6a2f1e}));
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshBasicMaterial({color:0x2a140e}));
   ground.rotation.x=-Math.PI/2;ground.position.z=-150;cityGroup.add(ground);
   const roadTex=canvasTex(64,256,(g,w,h)=>{
     const gr=g.createLinearGradient(0,0,w,0);
@@ -235,8 +238,8 @@ function buildMongkok(){
   function road(len,width,rotY,cx,cz){
     const t=roadTex.clone();t.needsUpdate=true;t.repeat.set(1,len/70);
     const g=new THREE.PlaneGeometry(width,len);g.rotateX(-Math.PI/2);if(rotY)g.rotateY(rotY);
-    const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:t}));m.position.set(cx,.15,cz);cityGroup.add(m);
-    const gl=new THREE.Mesh(g.clone(),new THREE.MeshBasicMaterial({color:0xff7a30,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:t,color:0x6a6a6a}));  // 거리는 어둡게, 불빛만 희미하게m.position.set(cx,.15,cz);cityGroup.add(m);
+    const gl=new THREE.Mesh(g.clone(),new THREE.MeshBasicMaterial({color:0xff7a30,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
     gl.scale.set(rotY?1:1.6,1,rotY?1.6:1);gl.position.set(cx,4,cz);cityGroup.add(gl);
   }
   road(820,ROAD_X*2+4,0,0,-140);
@@ -246,38 +249,36 @@ buildMongkok();
 const cityAnim=[];
 
 
-// 장대
-function stoneTex(){
-  const cv=document.createElement('canvas'); cv.width=128; cv.height=128;
-  const g=cv.getContext('2d'); g.fillStyle='#8e8e94'; g.fillRect(0,0,128,128);
-  g.strokeStyle='#6c6c72'; g.lineWidth=3;
-  for(let y=0;y<128;y+=32){g.beginPath();g.moveTo(0,y);g.lineTo(128,y);g.stroke();
-    const o=(y/32)%2?32:0; for(let x=o;x<128;x+=64){g.beginPath();g.moveTo(x,y);g.lineTo(x,y+32);g.stroke();}}
-  const t=new THREE.CanvasTexture(cv); t.wrapS=t.wrapT=THREE.RepeatWrapping; return t;
+// 장대: 휘지 않는 파란 낡은 콘크리트 원기둥, 밑동을 축으로 통째로 기울어짐
+function concreteTex(){
+  const R=rng(4242), c=document.createElement('canvas'); c.width=256; c.height=512;
+  const g=c.getContext('2d'), w=256, h=512;
+  g.fillStyle='#4467a8';g.fillRect(0,0,w,h);
+  for(let i=0;i<9000;i++){const l=R()<.5;g.fillStyle=l?'rgba(150,180,235,'+(R()*.25)+')':'rgba(10,20,55,'+(R()*.3)+')';g.fillRect(R()*w,R()*h,1+R()*2,1+R()*2)}
+  for(let i=0;i<14;i++){g.fillStyle='rgba(110,145,210,'+(0.25+R()*.3)+')';g.beginPath();g.ellipse(R()*w,R()*h,4+R()*18,3+R()*12,R()*3,0,Math.PI*2);g.fill()}
+  for(let i=0;i<22;i++){g.fillStyle='rgba(8,16,44,'+(0.12+R()*.25)+')';g.fillRect(R()*w,R()*h,1+R()*4,30+R()*160)}
+  g.fillStyle='rgba(6,12,36,.7)';g.fillRect(0,h-6,w,3);g.fillStyle='rgba(160,190,240,.35)';g.fillRect(0,h-3,w,2);
+  g.strokeStyle='rgba(6,10,30,.75)';g.lineWidth=1.2;
+  for(let i=0;i<6;i++){let x=R()*w,y=R()*h;g.beginPath();g.moveTo(x,y);for(let k=0;k<7;k++){x+=(R()-.5)*14;y+=6+R()*14;g.lineTo(x,y)}g.stroke()}
+  for(let x=0;x<w;x++){const b=.55+.45*Math.cos(2*Math.PI*(x/w-.25));g.fillStyle='rgba(4,8,26,'+((1-b)*.72)+')';g.fillRect(x,0,1,h)}
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); return t;
 }
-const st=stoneTex(); st.repeat.set(1,2);
-// 휘는 장대: 마디를 쌓아 곡선으로 휨
-const SEG=40, SL=TOP/SEG, SWAY=16;  // SWAY: 한계에서 꼭대기가 옆으로 밀리는 거리
-const stoneMat=new THREE.MeshLambertMaterial({map:st});
-const segs=[];
-for(let k=0;k<SEG;k++){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(1.8,SL*1.02,1.8),stoneMat);
-  scene.add(m); segs.push(m);
-}
-const top=new THREE.Vector3(0,TOP,0), tilt={x:0,z:0};
+const SWAY=16;  // 한계에서 꼭대기가 옆으로 밀리는 거리
+const CAP=.6;   // 꼭대기 받침 두께
+const poleTex=concreteTex(); poleTex.repeat.set(1,TOP/14);
+const pivot=new THREE.Group(); scene.add(pivot);
+const poleGeo=new THREE.CylinderGeometry(1.0,1.5,TOP,28); poleGeo.translate(0,TOP/2,0);
+pivot.add(new THREE.Mesh(poleGeo,new THREE.MeshBasicMaterial({map:poleTex})));
+const capTex=poleTex.clone(); capTex.needsUpdate=true; capTex.repeat.set(1,.12);
+const capM=new THREE.Mesh(new THREE.CylinderGeometry(1.25,1.15,CAP,28),new THREE.MeshBasicMaterial({map:capTex,color:0xbfc9e6}));
+capM.position.y=TOP+CAP/2; pivot.add(capM);
+const top=new THREE.Vector3(0,TOP+CAP,0), tilt={x:0,z:0};
 function bendPole(sx,sz){
-  // 꼭대기 변위 D, 모양 x(y)=D*(y/L)^2
-  const Dx=sx*SWAY, Dz=sz*SWAY;
-  for(let k=0;k<SEG;k++){
-    const u=(k+.5)/SEG, y=u*TOP;
-    const m=segs[k];
-    m.position.set(Dx*u*u,y,Dz*u*u);
-    const slx=2*Dx*u/TOP, slz=2*Dz*u/TOP;
-    m.rotation.set(Math.atan(slz),0,-Math.atan(slx));
-  }
-  top.set(Dx,TOP,Dz);   // 장대 윗면 한가운데 (예전엔 마디 반 개만큼 떠 있었음)
-  tilt.x=Math.atan(2*Dx/TOP); tilt.z=Math.atan(2*Dz/TOP);
+  tilt.x=Math.atan(sx*SWAY/TOP); tilt.z=Math.atan(sz*SWAY/TOP);
+  pivot.rotation.set(tilt.z,0,-tilt.x);
+  top.set(0,TOP+CAP,0).applyEuler(pivot.rotation);
 }
+
 
 // 사람 (앉은 자세, 엉덩이 = 회전축)
 const red=new THREE.MeshBasicMaterial({color:0x05070d,fog:false}); // 검은 실루엣
