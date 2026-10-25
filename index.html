@@ -48,7 +48,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.11</div>
+<div id="ver">v0.12</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -275,7 +275,7 @@ function bendPole(sx,sz){
     const slx=2*Dx*u/TOP, slz=2*Dz*u/TOP;
     m.rotation.set(Math.atan(slz),0,-Math.atan(slx));
   }
-  top.set(Dx,TOP+SL*.5,Dz);
+  top.set(Dx,TOP,Dz);   // 장대 윗면 한가운데 (예전엔 마디 반 개만큼 떠 있었음)
   tilt.x=Math.atan(2*Dx/TOP); tilt.z=Math.atan(2*Dz/TOP);
 }
 
@@ -286,7 +286,7 @@ const body=new THREE.Group(); man.add(body);
 function cyl(r,h){return new THREE.Mesh(new THREE.CylinderGeometry(r,r*.9,h,10),red);}
 for(const sx of [-1,1]){
   const thigh=cyl(.12,.55); thigh.rotation.x=Math.PI/2; thigh.rotation.z=sx*.35; thigh.position.set(.2*sx,.12,-.25); body.add(thigh);
-  const shin=cyl(.1,.5); shin.position.set(.32*sx,-.1,-.5); shin.rotation.z=sx*.2; body.add(shin);
+  const shin=cyl(.1,.5); shin.position.set(.05*sx,.08,-.52); shin.rotation.set(0,sx*.35,Math.PI/2); body.add(shin); // 책상다리: 정강이를 앞에서 교차
 }
 const torso=cyl(.24,.7); torso.position.set(0,.45,0); torso.rotation.x=-.25; body.add(torso);
 const head=new THREE.Mesh(new THREE.SphereGeometry(.17,16,12),red); head.position.set(0,.98,-.14); body.add(head);
