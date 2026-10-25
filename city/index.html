@@ -19,6 +19,7 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hid
   font-family:var(--body);-webkit-user-select:none;user-select:none;touch-action:none}
 [hidden]{display:none!important}
 #c{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);display:block;height:100%;width:auto;max-width:100%;aspect-ratio:1179/2556;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+@media (max-aspect-ratio:3/4){#c{left:0;transform:none;width:100%;aspect-ratio:auto;box-shadow:none}}
 html,body{background:#05060c}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
 .hud{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:2px;
@@ -113,7 +114,7 @@ const cv={dist:20};
 let view='2';
 let ZOOM=true; const ZK=.7, PIVY=.86;   // 축(화면 높이 86%)이 화면 아래 바로 바깥으로 가도록 위쪽 70%만 확대해서 보여줌
 function applyView(){
-  const h=innerHeight,w=Math.min(innerWidth,Math.round(h*1179/2556));   // 실제 폰(1179×2556) 비율 화면
+  const h=innerHeight,w=innerWidth/innerHeight<.75?innerWidth:Math.round(h*1179/2556);   // 폰(세로 화면)은 꽉 채우고, 넓은 화면에선 폰 비율 틀로
   let CH=RH*CROP, CW=CH*w/h; if(CW>RW*.95){CW=RW*.95;CH=CW*h/w;}
   const x0=Math.min(Math.max(TX-CW*2/3,-RW*.1),RW*1.1-CW), y0=Math.min(Math.max(TY-CH*2/3,-RH*.1),RH*1.1-CH);
   camera.fov=74; camera.aspect=RW/RH; if(ZOOM){camera.setViewOffset(RW,RH,x0+CW*(2/3)*(1-ZK),y0+CH*(PIVY-.02-ZK),CW*ZK,CH*ZK);}else camera.setViewOffset(RW,RH,x0,y0,CW,CH); camera.updateProjectionMatrix();
@@ -221,7 +222,7 @@ const fx=$('fx'), g2=fx.getContext('2d');
 let streaks=[];
 
 function resize(){
-  const h=innerHeight,w=Math.min(innerWidth,Math.round(h*1179/2556));   // 실제 폰(1179×2556) 비율 화면
+  const h=innerHeight,w=innerWidth/innerHeight<.75?innerWidth:Math.round(h*1179/2556);   // 폰(세로 화면)은 꽉 채우고, 넓은 화면에선 폰 비율 틀로
   renderer.setSize(w,h,false); applyView();
   fx.width=w*devicePixelRatio; fx.height=h*devicePixelRatio; g2.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
 }
