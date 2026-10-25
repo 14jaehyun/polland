@@ -1,0 +1,14 @@
+[
+ {
+  "id": "shinjuku",
+  "name": "Shinjuku"
+ },
+ {
+  "id": "seoul",
+  "name": "Seoul"
+ },
+ {
+  "id": "mongkok",
+  "name": "Mong Kok"
+ }
+]

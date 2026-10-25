@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+</head><body>
+<title>장대 위에서 도시</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Black+Han+Sans&display=swap">
+<style>
+/* 한 화면 게임: 3D 캔버스 전체 + 위쪽 기록 + 가운데 오버레이 */
+:root{
+  --bg:#050507; --fg:#f4f4f6; --dim:rgba(244,244,246,.55); --faint:rgba(244,244,246,.18);
+  --accent:#e0262b;
+  --display:"Black Han Sans","Apple SD Gothic Neo",system-ui,sans-serif;
+  --body:-apple-system,"Apple SD Gothic Neo",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden;
+  font-family:var(--body);-webkit-user-select:none;user-select:none;touch-action:none}
+[hidden]{display:none!important}
+#c{position:fixed;top:0;bottom:0;left:50%;transform:translateX(-50%);display:block;height:100%;width:auto;max-width:100%;aspect-ratio:1179/2556;box-shadow:0 0 0 1px rgba(255,255,255,.12)}
+html,body{background:#05060c}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+.hud{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 34px);pointer-events:none;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#time{font-family:var(--display);font-size:56px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#pop{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;min-height:1em}
+#best{font-size:12px;color:var(--dim);letter-spacing:.08em;font-variant-numeric:tabular-nums}
+.ov{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:rgba(5,5,7,.55);text-align:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.ov h1{font-family:var(--display);font-weight:400;font-size:44px;margin:0;line-height:1.05;text-wrap:balance}
+.ov h1 b{color:var(--accent);font-weight:400}
+.ov p{margin:0;color:var(--dim);font-size:14px;line-height:1.6;max-width:28ch}
+.big{font-family:var(--display);font-size:72px;line-height:1;font-variant-numeric:tabular-nums}
+button{font:inherit;font-family:var(--display);font-size:20px;color:var(--bg);background:var(--fg);border:0;
+  border-radius:999px;padding:14px 44px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+button:active{transform:scale(.97)}
+.loc{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none;color:#d3def5;text-shadow:0 1px 8px rgba(4,8,22,.7)}
+.loc .place{display:flex;flex-direction:column;gap:2px}
+.loc h2{margin:0;font-family:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;font-weight:900;font-size:2.4rem;line-height:.9;letter-spacing:.02em;text-transform:uppercase}
+.loc .sub{font-size:.78rem;color:rgba(211,222,245,.58);letter-spacing:.06em}
+.loc .meter{text-align:right;display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.loc .h{font-family:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;font-weight:700;font-size:1.9rem;line-height:.9;color:#ff8a3d}
+.loc .h small{font-size:.9rem;margin-left:2px}
+.loc .t{font-size:.74rem;color:rgba(211,222,245,.58);letter-spacing:.04em}
+#ver{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;pointer-events:none;z-index:5}
+#dir{position:fixed;right:max(14px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 82px);z-index:20;font-family:var(--body);font-size:12px;font-weight:600;color:var(--fg);background:rgba(244,244,246,.12);border:1px solid var(--faint);padding:8px 12px}
+#mode{position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:12px;color:var(--dim);pointer-events:none;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
+.hud,#mode,#dir,#over,#ver{display:none!important}
+.tog{display:flex;gap:6px;position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 78px);z-index:30}
+.tog select{font:600 13px system-ui,sans-serif;padding:8px 10px;border-radius:999px;border:0;background:rgba(244,244,246,.88);color:#05060c}
+.tog button{font-size:13px;padding:8px 12px;background:rgba(244,244,246,.88);white-space:nowrap}
+</style>
+
+<canvas id="c"></canvas>
+<canvas id="fx"></canvas>
+<div class="loc"><div class="place"><h2 id="cname"></h2><span class="sub" id="csub"></span></div><div class="meter"><span class="h">320<small>m</small></span><span class="t">기울기 <span id="tiltv">0.0</span>°</span></div></div>
+<div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
+<button id="dir" type="button"></button>
+<div id="mode"></div>
+<div id="ver">v0.19 · seoul 판 회전</div>
+
+<div class="tog"><select id="city" aria-label="도시"></select><button type="button" id="aL" aria-label="장대 왼쪽으로">◀</button><button type="button" id="aV">장대 0°</button><button type="button" id="aR" aria-label="장대 오른쪽으로">▶</button><button type="button" id="bAmp">흔들림 보통</button></div>
+<div class="ov" id="start" style="display:none">
+  <h1>장대 위에서<br><b>버티기</b></h1>
+  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡고, 날아오는 방해물은 눌러서 터뜨리세요. 기울인 쪽(화면 기준)으로 장대가 휘어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
+  <button id="go" type="button">시작</button>
+  <p style="font-size:12px">화면 회전 잠금을 켜두면 좋아요</p>
+</div>
+<div class="ov" id="over" hidden>
+  <p>버틴 시간</p>
+  <div class="big" id="final">0.0</div>
+  <p id="rec"></p>
+  <p id="popres"></p>
+  <button id="again" type="button">다시</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+function START(CD){
+const TOP=320;               // 장대 높이 (도시 시안과 같은 단위, 화면 표시 320m)
+const LIMIT=2.2;             // 흔들림 한계: 2.2 = 꼭대기가 SWAY의 2.2배 밀림 ≈ 10°
+const $=id=>document.getElementById(id);
+
+// ---------- 렌더러 / 씬 ----------
+const renderer=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});
+let PR=Math.min(devicePixelRatio,2); renderer.setPixelRatio(PR);
+// 폰이 버거워하면(2초 평균 40fps 미만) 해상도를 한 단계씩 낮춤
+let pfT=0,pfN=0;
+function perf(dt){ pfT+=dt;pfN++; if(pfT>2){ const fps=pfN/pfT; pfT=0;pfN=0; if(fps<40&&PR>1){ PR=Math.max(1,PR-.25); renderer.setPixelRatio(PR); resize(); } } }
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x18224a);
+scene.fog=null;
+const camera=new THREE.PerspectiveCamera(74,1024/1536,.3,3000);
+const camPos=new THREE.Vector3();
+// 그림을 뽑을 때 쓴 카메라(대각선 56°·28°) 그대로. 그림은 크롭 전 2:3, 화면은 그 가운데 75% 높이를 잘라 씀
+const D=Math.PI/180, RW=1024, RH=1536, CROP=.75, TX=625, TY=1042, FOLLOW=1;
+const UP=new THREE.Vector3(0,1,0), UPP=new THREE.Vector3(...CD.up).normalize(), qP=new THREE.Quaternion().setFromUnitVectors(UPP,UP);
+const T0=new THREE.Vector3(0,TOP,0);
+const pc=new THREE.PerspectiveCamera(74,1179/2556,.3,3000);
+pc.rotation.order='YXZ'; pc.rotation.set(-56*D,-28*D,0); pc.updateMatrixWorld(true);
+{const d0=new THREE.Vector3(1/3,-1/3,.5).unproject(pc).normalize(); pc.position.set(-d0.x*20,TOP+1-d0.y*20,-d0.z*20); pc.aspect=RW/RH; pc.updateProjectionMatrix(); pc.updateMatrixWorld(true);}
+const camQuat=qP.clone().multiply(pc.quaternion);
+const camOffset=pc.position.clone().sub(T0).applyQuaternion(qP).sub(new THREE.Vector3(0,.3,0));   // 꼭대기(받침 위) 기준
+const scrR=new THREE.Vector3(1,0,0).applyQuaternion(camQuat); scrR.y=0; scrR.normalize();
+const scrD=new THREE.Vector3(0,-1,0).applyQuaternion(camQuat); scrD.y=0; scrD.normalize();
+const cv={dist:20};
+let view='2';
+let ZOOM=true; const ZK=.7, PIVY=.86;   // 축(화면 높이 86%)이 화면 아래 바로 바깥으로 가도록 위쪽 70%만 확대해서 보여줌
+function applyView(){
+  const h=innerHeight,w=Math.min(innerWidth,Math.round(h*1179/2556));   // 실제 폰(1179×2556) 비율 화면
+  let CH=RH*CROP, CW=CH*w/h; if(CW>RW*.95){CW=RW*.95;CH=CW*h/w;}
+  const x0=Math.min(Math.max(TX-CW*2/3,-RW*.1),RW*1.1-CW), y0=Math.min(Math.max(TY-CH*2/3,-RH*.1),RH*1.1-CH);
+  camera.fov=74; camera.aspect=RW/RH; if(ZOOM){camera.setViewOffset(RW,RH,x0+CW*(2/3)*(1-ZK),y0+CH*(PIVY-.02-ZK),CW*ZK,CH*ZK);}else camera.setViewOffset(RW,RH,x0,y0,CW,CH); camera.updateProjectionMatrix();
+}
+applyView();
+
+
+// ---------- 도시: 생성 그림을 깊이대로 띄운 판 ----------
+// 판은 제자리에서 화면 안의 한 점(장대가 땅에 닿아 보이는 곳 PV)을 축으로 회전만 함
+const PG=new THREE.Group(), PGi=new THREE.Group(); PG.add(PGi); scene.add(PG); let reliefMesh=null, poleM=null; const PV=new THREE.Vector3();
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+{
+  const [CU0,CUW,CV0,CVH]=CD.frame;   // 이 그림이 기준 틀에서 차지하는 부분
+  const G={nx:CD.nx,ny:CD.ny}, VD=new Float32Array(Uint8Array.from(atob(CD.vd),c=>c.charCodeAt(0)).buffer);
+  const img=new Image(); const tex=new THREE.Texture(img); img.onload=()=>{tex.needsUpdate=true;}; img.src=CD.img;
+  tex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  // 그림 가장자리 바깥으로 15%씩 더 늘려서(끝 픽셀을 그대로 늘림) 흔들려도 빈 곳이 안 보이게
+  const ex=Math.round((G.nx-1)*.3),ey=Math.round((G.ny-1)*.3),nx=G.nx+2*ex,ny=G.ny+2*ey,pos=new Float32Array(nx*ny*3),uv=new Float32Array(nx*ny*2),tv=Math.tan(74*Math.PI/360),asp=RW/RH,v3=new THREE.Vector3();
+  const cl=(a,lo,hi)=>a<lo?lo:a>hi?hi:a;
+  const mr=(k,n)=>{k=k<0?-k:k;return k>n-1?Math.max(0,2*(n-1)-k):k;};   // 그림 밖은 거울처럼 접어서 이어 붙임
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const k=j*nx+i,u=(i-ex)/(G.nx-1),v=(j-ey)/(G.ny-1),mi=mr(i-ex,G.nx),mj=mr(j-ey,G.ny),d=VD[mj*G.nx+mi];
+    const bu=CU0+u*CUW,bv=CV0+v*CVH;v3.set((bu*2-1)*asp*tv*d,(1-bv*2)*tv*d,-d).applyMatrix4(pc.matrixWorld);pos[k*3]=v3.x;pos[k*3+1]=v3.y;pos[k*3+2]=v3.z;uv[k*2]=mi/(G.nx-1);uv[k*2+1]=1-mj/(G.ny-1);}
+  const idx=[];for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i,b=a+1,c=a+nx,d=c+1;idx.push(a,c,b,b,c,d);}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));geo.setIndex(idx);
+  // 그림 속 세상은 위 방향이 살짝 기울어 있어서, 장대 꼭대기를 축으로 돌려 우리 장면의 위와 맞춤
+  const paintG=new THREE.Group(); paintG.quaternion.copy(qP); paintG.position.copy(T0).sub(T0.clone().applyQuaternion(qP)); PGi.add(paintG);
+  reliefMesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,fog:false})); paintG.add(reliefMesh);
+}
+
+
+// 장대: 휘지 않는 파란 낡은 콘크리트 원기둥, 밑동을 축으로 통째로 기울어짐
+function concreteTex(){
+  const R=rng(4242), c=document.createElement('canvas'); c.width=256; c.height=512;
+  const g=c.getContext('2d'), w=256, h=512;
+  g.fillStyle='#4467a8';g.fillRect(0,0,w,h);
+  for(let i=0;i<9000;i++){const l=R()<.5;g.fillStyle=l?'rgba(150,180,235,'+(R()*.25)+')':'rgba(10,20,55,'+(R()*.3)+')';g.fillRect(R()*w,R()*h,1+R()*2,1+R()*2)}
+  for(let i=0;i<14;i++){g.fillStyle='rgba(110,145,210,'+(0.25+R()*.3)+')';g.beginPath();g.ellipse(R()*w,R()*h,4+R()*18,3+R()*12,R()*3,0,Math.PI*2);g.fill()}
+  for(let i=0;i<22;i++){g.fillStyle='rgba(8,16,44,'+(0.12+R()*.25)+')';g.fillRect(R()*w,R()*h,1+R()*4,30+R()*160)}
+  g.fillStyle='rgba(6,12,36,.7)';g.fillRect(0,h-6,w,3);g.fillStyle='rgba(160,190,240,.35)';g.fillRect(0,h-3,w,2);
+  g.strokeStyle='rgba(6,10,30,.75)';g.lineWidth=1.2;
+  for(let i=0;i<6;i++){let x=R()*w,y=R()*h;g.beginPath();g.moveTo(x,y);for(let k=0;k<7;k++){x+=(R()-.5)*14;y+=6+R()*14;g.lineTo(x,y)}g.stroke()}
+  for(let x=0;x<w;x++){const b=.55+.45*Math.cos(2*Math.PI*(x/w-.25));g.fillStyle='rgba(4,8,26,'+((1-b)*.72)+')';g.fillRect(x,0,1,h)}
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy()); return t;
+}
+const SWAY=25.6;  // 한계에서 꼭대기가 옆으로 밀리는 거리 (높이 320 기준, 한도 10° 그대로)
+const CAP=.3;   // 꼭대기 받침 두께
+const poleTex=concreteTex(); poleTex.repeat.set(1,TOP/14);
+const pivot=new THREE.Group(); scene.add(pivot);
+const poleGeo=new THREE.CylinderGeometry(.6,1.7,TOP,28); poleGeo.translate(0,TOP/2,0);
+{const pm=new THREE.Mesh(poleGeo,new THREE.MeshBasicMaterial({map:poleTex,depthTest:false}));pm.renderOrder=1;pivot.add(pm);poleM=pm;}
+const capTex=poleTex.clone(); capTex.needsUpdate=true; capTex.repeat.set(1,.12);
+const capM=new THREE.Mesh(new THREE.CylinderGeometry(.75,.68,CAP,28),new THREE.MeshBasicMaterial({map:capTex,color:0xbfc9e6}));
+capM.position.y=TOP+CAP/2; pivot.add(capM); capM.renderOrder=2;
+const top=new THREE.Vector3(0,TOP+CAP,0), tilt={x:0,z:0};
+function bendPole(sx,sz){
+  tilt.x=Math.atan(sx*SWAY/TOP); tilt.z=Math.atan(sz*SWAY/TOP);
+  // 장대·사람·카메라는 화면에 고정 (기울기는 판의 회전으로만 보임)
+}
+
+
+  // ---------- 걸터앉은 사람: 키 170cm, 상면 지름 150cm 실제 비율. 등이 카메라 쪽 ----------
+  // 매끈한 관절 인형 같은 덩어리감, 검정 실루엣에 은은한 빛 반사(위는 푸른 하늘빛, 아래는 거리의 주황빛)
+  const ink=new THREE.MeshStandardMaterial({color:0x0a0c12,roughness:.38,metalness:.25});
+  const hemi=new THREE.HemisphereLight(0x8fa6ff,0xff8a3d,.55); scene.add(hemi);
+  const rim=new THREE.DirectionalLight(0xbfd0ff,.6); rim.position.set(-30,40,-60); scene.add(rim);
+  const Y=new THREE.Vector3(0,1,0);
+  const man=new THREE.Group(); scene.add(man);          // 장대 꼭대기를 따라가며 기울어짐
+  const body=new THREE.Group(); man.add(body);            // 흔들릴 때 몸이 살짝 버팀
+  const fig=new THREE.Group(); body.add(fig);
+  fig.rotation.y=-28*Math.PI/180; fig.scale.setScalar(1.5); fig.translateZ(.6);   // 카메라와 같은 방향(등이 보임), 상면 100cm에 키 170cm 비율, 가운데 쪽으로
+  const shadowPlate=new THREE.Mesh(new THREE.PlaneGeometry(.62,.7),new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.42,depthWrite:false}));
+  shadowPlate.rotation.x=-Math.PI/2; shadowPlate.position.set(0,.004,-.44); fig.add(shadowPlate);   // 사람 그림자: 단순한 검은 판   // 상면(지름 1.5)을 100cm로 보고 키 170cm 비율 → 1.5배   // 카메라와 같은 방향을 봄 → 등이 보임
+  const V=a=>new THREE.Vector3(...a);
+  function cap2(a,b,r1,r2){ // 양 끝이 둥근 막대 (매끈한 팔다리)
+    const A=V(a),B=V(b),d=B.clone().sub(A),L=d.length();
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(r2,r1,L,16),ink);m.position.copy(A).addScaledVector(d,.5);m.quaternion.setFromUnitVectors(Y,d.clone().normalize());fig.add(m);
+    for(const [p,r] of [[A,r1],[B,r2]]){const j=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),ink);j.position.copy(p);fig.add(j);}
+  }
+  function along(geo,a,b,sx,sz){ // a→b 축을 따라 세운 덩어리
+    const A=V(a),B=V(b),d=B.clone().sub(A);const m=new THREE.Mesh(geo,ink);m.position.copy(A);m.quaternion.setFromUnitVectors(Y,d.clone().normalize());m.scale.set(sx,d.length(),sz);fig.add(m);return m;}
+  const lathe=pts=>new THREE.LatheGeometry(pts.map(([r,y])=>new THREE.Vector2(r,y)),24);
+  // 몸통: 골반 → 허리 → 가슴 → 어깨 (높이 1로 만들고 길이에 맞춰 늘림), 살짝 웅크려 앞으로 기울임
+  const PEL=[0,.13,-.4], SHO=[0,.62,-.5];
+  along(lathe([[0,0],[.13,.02],[.165,.09],[.16,.2],[.13,.4],[.135,.55],[.165,.75],[.175,.86],[.15,.95],[.07,1],[0,1.01]]),PEL,SHO,1.12,.62);
+  // 목·머리 (고개 숙임)
+  cap2([0,.64,-.53],[0,.71,-.6],.048,.045);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.1,20,16),ink);head.scale.set(.88,1.15,1.02);head.position.set(0,.79,-.67);head.rotation.x=-.5;fig.add(head);
+  // 팔: 어깨 → 팔꿈치 → 손목, 손은 엉덩이 옆 상면을 짚음
+  for(const s of [-1,1]){
+    cap2([s*.18,.58,-.49],[s*.22,.34,-.43],.05,.04);
+    cap2([s*.22,.34,-.43],[s*.25,.1,-.38],.04,.03);
+    const hand=new THREE.Mesh(new THREE.SphereGeometry(.045,12,10),ink);hand.scale.set(.9,.6,1.6);hand.position.set(s*.26,.045,-.42);fig.add(hand);
+  }
+  // 다리: 엉덩이 → 무릎(가장자리 밖) → 발목(아래로 늘어뜨림) → 발
+  for(const s of [-1,1]){
+    cap2([s*.09,.1,-.42],[s*.1,.08,-.85],.075,.052);
+    cap2([s*.1,.08,-.85],[s*.11,-.33,-.92],.048,.033);
+    const foot=new THREE.Mesh(new THREE.SphereGeometry(.05,12,10),ink);foot.scale.set(.9,.8,2.2);foot.position.set(s*.11,-.37,-.99);foot.rotation.x=.5;fig.add(foot);
+  }
+
+
+man.traverse(o=>o.renderOrder=2);
+// ---------- 효과 캔버스 (바람 줄) ----------
+const fx=$('fx'), g2=fx.getContext('2d');
+let streaks=[];
+
+function resize(){
+  const h=innerHeight,w=Math.min(innerWidth,Math.round(h*1179/2556));   // 실제 폰(1179×2556) 비율 화면
+  renderer.setSize(w,h,false); applyView();
+  fx.width=w*devicePixelRatio; fx.height=h*devicePixelRatio; g2.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+addEventListener('resize',resize); resize();
+// 축 정하기: 화면에서 장대를 따라 내려가다 화면 높이 PIVY 지점에서 멈추고, 그 뒤에 보이는 땅을 축으로. 장대도 거기까지만 그림
+let ADJ=CD.adj||0; const qA=new THREE.Quaternion();
+function computePivot(){
+  if(!reliefMesh||!poleM) return;
+  ZOOM=false; applyView();
+  PG.quaternion.identity(); PG.position.set(0,0,0); PGi.position.set(0,0,0); scene.updateMatrixWorld(true);
+  camera.position.set(0,TOP+CAP,0).add(camOffset); camera.quaternion.copy(camQuat); camera.updateMatrixWorld(true);
+  // 장대 방향: 그림 속 수직(아래)을 화면에서 ADJ°만큼 돌림 (카메라→꼭대기 선을 축으로)
+  const T0=new THREE.Vector3(0,TOP,0), axis=T0.clone().sub(camera.position).normalize();
+  const dv=new THREE.Vector3(0,-1,0).applyAxisAngle(axis,ADJ*Math.PI/180).normalize();
+  qA.setFromUnitVectors(new THREE.Vector3(0,-1,0),dv);
+  const ty=1-2*PIVY, v=new THREE.Vector3(); let s=1;
+  for(;s<TOP;s+=.25){ v.copy(T0).addScaledVector(dv,s).project(camera); if(v.y<=ty) break; }
+  const ray=new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(v.x,ty),camera);
+  const hit=ray.intersectObject(reliefMesh,false)[0]; if(!hit) return;
+  PV.copy(hit.point); PG.position.copy(PV); PGi.position.copy(PV).multiplyScalar(-1);
+  // 아래로 갈수록 확 가늘어지고(위 0.6 → 아래 0.18), 도시 빛에 묻히듯 어두운 푸른색으로 바램 → 높이감
+  const g=new THREE.CylinderGeometry(.6,.18,s,28,24); g.translate(0,-s/2,0);
+  const P=g.attributes.position, C=new Float32Array(P.count*3);
+  for(let i=0;i<P.count;i++){const k=Math.pow(-P.getY(i)/s,.8); C[i*3]=1-.72*k; C[i*3+1]=1-.66*k; C[i*3+2]=1-.48*k;}
+  g.setAttribute('color',new THREE.BufferAttribute(C,3));
+  poleM.geometry.dispose(); poleM.geometry=g; poleM.material.vertexColors=true; poleM.material.needsUpdate=true;
+  poleM.position.copy(T0); poleM.quaternion.copy(qA);
+  capM.position.copy(T0).add(new THREE.Vector3(0,CAP/2,0).applyQuaternion(qA)); capM.quaternion.copy(qA);
+  ZOOM=true; applyView();
+}
+computePivot(); addEventListener('resize',computePivot);
+
+// ---------- 방해물 ----------
+const obGeo=new THREE.OctahedronGeometry(.45,0);
+const obMat=new THREE.MeshStandardMaterial({color:0xf4f4f6,roughness:.4,emissive:0x555560});
+const bitGeo=new THREE.TetrahedronGeometry(.14,0);
+let obs=[], bits=[], popped=0, obNext=0;
+function spawnOb(){
+  // 화면 기준 각도 45°(오른쪽 위)~225°(왼쪽 아래): 오른쪽·아래쪽에서는 안 나옴
+  const a=(45+Math.random()*180)*Math.PI/180, R=cv.dist*1.6, ca=Math.cos(a), sa=Math.sin(a);
+  const m=new THREE.Mesh(obGeo,obMat);
+  m.position.set(top.x+(ca*scrR.x-sa*scrD.x)*R, top.y+1+Math.random()*2.5, top.z+(ca*scrR.z-sa*scrD.z)*R);
+  const sp=(2.6+Math.random()*1.8+Math.min(t,120)*.012)*R/16;
+  obs.push({m,sp,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
+  scene.add(m);
+}
+function burst(p,n,col){
+  const mat=new THREE.MeshBasicMaterial({color:col,transparent:true});
+  for(let k=0;k<n;k++){
+    const b=new THREE.Mesh(bitGeo,mat); b.position.copy(p);
+    const v=new THREE.Vector3(Math.random()-.5,Math.random()-.2,Math.random()-.5).normalize().multiplyScalar(3+Math.random()*4);
+    scene.add(b); bits.push({b,v,life:1});
+  }
+}
+function clearObs(){ for(const o of obs) scene.remove(o.m); obs=[]; }
+function updateObs(dt){
+  if(state==='play'&&t>15){
+    obNext-=dt;
+    if(obNext<=0){ spawnOb(); obNext=Math.max(1.4,4.5-t*.012)+Math.random()*2.5; }
+  }
+  const aim=new THREE.Vector3();
+  for(let k=obs.length-1;k>=0;k--){
+    const o=obs[k];
+    aim.set(man.position.x,man.position.y+1.1,man.position.z).sub(o.m.position);
+    const d=aim.length();
+    o.m.position.addScaledVector(aim.normalize(),o.sp*dt);
+    o.m.rotation.x+=o.spin.x*dt*3; o.m.rotation.y+=o.spin.y*dt*3;
+    if(d<1.3&&state==='play'){
+      // 맞으면 날아온 방향으로 크게 밀림
+      om.x+=aim.x*.55; om.z+=aim.z*.55;
+      burst(o.m.position,10,0xd8181f); scene.remove(o.m); obs.splice(k,1);
+    }
+  }
+  for(let k=bits.length-1;k>=0;k--){
+    const p=bits[k]; p.life-=dt*1.6; p.v.y-=6*dt;
+    p.b.position.addScaledVector(p.v,dt); p.b.material.opacity=Math.max(0,p.life);
+    if(p.life<=0){scene.remove(p.b);bits.splice(k,1);}
+  }
+}
+function tapOb(x,y){
+  // 화면 터치 위치와 가장 가까운 방해물 (넉넉한 판정)
+  let best=null,bd=56;
+  const v=new THREE.Vector3();
+  for(const o of obs){
+    v.copy(o.m.position).project(camera);
+    const sx=(v.x+1)/2*innerWidth, sy=(1-v.y)/2*innerHeight;
+    const d=Math.hypot(sx-x,sy-y); if(d<bd){bd=d;best=o;}
+  }
+  if(!best) return false;
+  burst(best.m.position,14,0xf4f4f6); scene.remove(best.m); obs.splice(obs.indexOf(best),1);
+  popped++; $('pop').textContent=popped?'터뜨림 '+popped:'';
+  return true;
+}
+
+// ---------- 입력 ----------
+let ori=null, base=null, gotOri=false;
+function showView(){$('dir').textContent=view==='1'?'시점 1 · 수직':'시점 2 · 대각선';}
+$('dir').addEventListener('pointerdown',e=>e.stopPropagation());
+$('dir').hidden=true;
+showView();
+let touchStart=null, touchVec={x:0,y:0};
+const keys={};
+addEventListener('deviceorientation',e=>{
+  if(e.beta==null) return; ori={b:e.beta,g:e.gamma}; gotOri=true;
+});
+addEventListener('pointerdown',e=>{if(state!=='play')return;if(tapOb(e.clientX,e.clientY))return;touchStart={x:e.clientX,y:e.clientY};});
+addEventListener('pointermove',e=>{if(!touchStart)return;touchVec={x:e.clientX-touchStart.x,y:e.clientY-touchStart.y};});
+addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
+addEventListener('pointercancel',()=>{touchStart=null;touchVec={x:0,y:0};});
+addEventListener('keydown',e=>keys[e.key]=true); addEventListener('keyup',e=>keys[e.key]=false);
+
+const MAXT=0.75; // 최대 기울기 입력(rad) — 작은 기울기 반응은 그대로, 끝까지 기울이면 더 세게 되돌림
+function readTilt(){
+  // 반환: 쟁반 기울기 φ (x: 오른쪽 내려감 +, z: 화면 아래쪽 내려감 +)
+  if(gotOri&&ori&&base){
+    let gx=(ori.g-base.g), bz=(ori.b-base.b);
+    const d=Math.PI/180;
+    return {x:clamp(gx*d,-MAXT,MAXT), z:clamp(bz*d,-MAXT,MAXT)};
+  }
+  let x=0,z=0;
+  if(touchStart){x=touchVec.x/110*MAXT; z=touchVec.y/110*MAXT;}
+  if(keys.ArrowLeft)x-=MAXT*.7; if(keys.ArrowRight)x+=MAXT*.7;
+  if(keys.ArrowUp)z-=MAXT*.7; if(keys.ArrowDown)z+=MAXT*.7;
+  return {x:clamp(x,-MAXT,MAXT), z:clamp(z,-MAXT,MAXT)};
+}
+function clamp(v,a,b){return v<a?a:v>b?b:v}
+
+// ---------- 게임 상태 ----------
+let state='ready', t=0, th={x:0,z:0}, om={x:0,z:0};
+let wind={x:0,z:0,left:0,next:3}, fall=null, wake=null;
+let best=0; try{best=+localStorage.getItem('pole-best-seoul')||0}catch(e){}
+$('best').textContent='최고 '+best.toFixed(1)+'초';
+
+async function begin(){
+  $('start').hidden=true; $('over').hidden=true;
+  $('start').style.display='none'; $('over').style.display='none';
+  try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission)
+        await DeviceOrientationEvent.requestPermission(); }catch(e){}
+  try{ wake=await navigator.wakeLock.request('screen'); }catch(e){}
+  setTimeout(()=>{ base=ori?{...ori}:null;
+    $('mode').textContent=gotOri?'기울기 조작':'기울기 센서 없음 · 손가락 드래그로 조작';
+  },250);
+  reset(); state='play';
+}
+function reset(){
+  clearObs(); popped=0; obNext=0; $('pop').textContent='';
+  t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
+  wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
+  bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
+}
+$('go').onclick=begin; $('again').onclick=begin;
+
+function gameOver(){
+  state='fall'; clearObs();
+  const d=Math.hypot(th.x,th.z)||1;
+  fall={vx:th.x/d*4+om.x*SWAY*.5,vz:th.z/d*4+om.z*SWAY*.5,vy:1,ry:0,time:0};
+}
+function showResult(){
+  state='over'; $('over').style.display='';
+  const isBest=t>best; if(isBest){best=t;try{localStorage.setItem('pole-best-seoul',best)}catch(e){}}
+  $('final').textContent=t.toFixed(1);
+  $('popres').textContent=popped?'방해물 '+popped+'개 터뜨림':'';
+  $('rec').textContent=isBest?'새 기록':'최고 '+best.toFixed(1)+'초';
+  $('best').textContent='최고 '+best.toFixed(1)+'초';
+  $('over').hidden=false;
+}
+
+// ---------- 루프 ----------
+let last=performance.now(), tiltT=0;
+function step(now){
+  const dt=Math.min(.033,(now-last)/1000); last=now;
+  if(state==='play') physics(dt);
+  else if(state==='fall') falling(dt);
+  else idle(now/1000);
+  updateObs(dt);
+  
+  perf(dt);
+  tiltT+=dt; if(tiltT>.1){ tiltT=0; $('tiltv').textContent=(Math.hypot(tilt.x,tilt.z)*180/Math.PI).toFixed(1); }
+  draw(dt);
+  requestAnimationFrame(step);
+}
+function physics(dt){
+  t+=dt;
+  const k=.45+Math.min(t,120)*.0013;           // 휘청이는 힘, 아주 천천히 강해짐 (최대 .6)
+  const c=3.2, damp=.55;                        // 되돌리는 힘 최대 3.2×.75=2.4 > 10°에서 쓰러지려는 힘 최대 2.1 → 어느 각도든 원복 가능, 떨어지는 건 반동 때문
+  const jit=.06+Math.min(t,120)*.0008;         // 대신 잔흔들림이 늘어남
+  const phi=readTilt();
+  // 바람: 10초 이후, 세기·길이 랜덤
+  let wx=0,wz=0;
+  if(t>10){
+    wind.next-=dt;
+    if(wind.next<=0&&wind.left<=0){
+      const a=Math.random()*Math.PI*2, w=.1+Math.random()*.35;
+      wind={x:Math.cos(a)*w,z:Math.sin(a)*w,w,left:1+Math.random()*4,next:0};
+    }
+    if(wind.left>0){
+      wind.left-=dt; wx=wind.x; wz=wind.z;
+      if(wind.left<=0) wind.next=3+Math.random()*4;
+      if(Math.random()<wind.w*1.6) streaks.push({x:wind.x>0?-40:innerWidth+40,y:Math.random()*innerHeight,dx:Math.sign(wind.x)||1,dy:wind.z/wind.w*.25,l:30+wind.w*200,life:1,a:.15+wind.w});
+    }
+  }
+  // 조작·바람은 화면 기준 → 땅 위 방향으로 바꿈 (시점이 바뀌어도 기울인 화면 쪽으로 휨)
+  const sx=c*phi.x+wx, sz=c*phi.z+wz;
+  const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
+  for(const a of ['x','z']){
+    const acc=k*th[a]*(1+.12*th[a]*th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
+    om[a]+=acc*dt; th[a]+=om[a]*dt;
+  }
+  if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
+  $('time').textContent=t.toFixed(1);
+  bendPole(th.x,th.z); placeMan(); pose(1);
+  followCam(dt);
+}
+function placeMan(){ man.position.set(0,TOP,0).add(new THREE.Vector3(0,CAP,0).applyQuaternion(qA)); man.quaternion.copy(qA); }
+const qT=new THREE.Quaternion(), eT=new THREE.Euler(), offR=new THREE.Vector3(), scrP=new THREE.Vector3();
+const qI=new THREE.Quaternion(), qV=new THREE.Quaternion();
+function followCam(dt){
+  // 카메라는 쉬는 자리에 고정, 판만 축 PV를 중심으로 장대 기울기의 반대로 회전
+  camera.position.copy(top).add(camOffset); camera.quaternion.copy(camQuat);
+  eT.set(tilt.z,0,-tilt.x); qT.setFromEuler(eT); PG.quaternion.copy(qT).invert();
+}
+function pose(flail){
+  // 흔들리면 몸을 반대로 살짝 기울여 버팀
+  body.rotation.set(-om.z*.12,0,om.x*.12);
+}
+function falling(dt){
+  fall.time+=dt; fall.vy-=20*dt;
+  man.position.x+=fall.vx*dt; man.position.z+=fall.vz*dt; man.position.y+=fall.vy*dt;
+  man.rotation.x+=Math.sign(th.z||.01)*dt*2.5; man.rotation.z-=Math.sign(th.x||.01)*dt*2.5;
+  // 장대는 천천히 제자리로
+  om.x*=.97; om.z*=.97; th.x*=.985; th.z*=.985; bendPole(th.x,th.z);
+  if(fall.time>2.4&&state==='fall') showResult();
+}
+const AMP=[0,.5,1.1,1.9],AN=['멈춤','살살','보통','크게'];let ai=2;
+function idle(s){
+  if(state!=='ready') return;
+  const A=AMP[ai]; th.x=A*(Math.sin(s*.5)+.35*Math.sin(s*1.3+1)); th.z=A*.85*(Math.cos(s*.37)+.3*Math.sin(s*1.1)); om={x:Math.cos(s*.5)*.06,z:-Math.sin(s*.37)*.04};
+  bendPole(th.x,th.z); placeMan(); pose(0); followCam(.016);
+}
+function draw(){
+  renderer.render(scene,camera);
+  g2.clearRect(0,0,innerWidth,innerHeight);
+  g2.lineWidth=1.5; g2.lineCap='round';
+  streaks=streaks.filter(s=>s.life>0);
+  for(const s of streaks){
+    s.x+=s.dx*18; s.y+=s.dy*18; s.life-=.02;
+    g2.strokeStyle='rgba(255,255,255,'+((s.a||.35)*s.life)+')';
+    g2.beginPath(); g2.moveTo(s.x,s.y); g2.lineTo(s.x-s.dx*s.l,s.y-s.dy*s.l); g2.stroke();
+  }
+}
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible'&&state==='play'){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
+});
+const setA=d=>{ADJ=Math.round((ADJ+d)*10)/10;$('aV').textContent='장대 '+(ADJ>0?'+':'')+ADJ+'°';computePivot();};
+$('aV').textContent='장대 '+(ADJ>0?'+':'')+ADJ+'°';
+$('aL').onclick=()=>setA(-2);$('aR').onclick=()=>setA(2);
+$('bAmp').onclick=()=>{ai=(ai+1)%AMP.length;$('bAmp').textContent='흔들림 '+AN[ai];};
+requestAnimationFrame(step);
+}
+// ---------- 도시 불러오기: ?c=도시id (목록은 cities.json) ----------
+(async()=>{
+  let list=[];try{list=await (await fetch('cities.json',{cache:'no-cache'})).json();}catch(e){}
+  const q=new URLSearchParams(location.search), id=q.get('c')||(list[0]&&list[0].id)||'shinjuku';
+  const sel=document.getElementById('city');
+  for(const c of list){const o=document.createElement('option');o.value=c.id;o.textContent=c.name;if(c.id===id)o.selected=true;sel.appendChild(o);}
+  sel.onchange=()=>{location.search='?c='+sel.value;};
+  const CD=await (await fetch(id+'.json',{cache:'no-cache'})).json(); CD.img=id+'.jpg';
+  document.title=CD.name+' · 장대 위에서'; document.getElementById('cname').textContent=CD.name; document.getElementById('csub').textContent=CD.sub;
+  START(CD);
+})();
+</script>
+
+</body></html>
