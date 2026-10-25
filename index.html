@@ -5,7 +5,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Black+Han+Sans&display=swap">
 <style>
 /* 한 화면 게임: 3D 캔버스 전체 + 위쪽 기록 + 가운데 오버레이 */
 :root{
@@ -20,8 +20,8 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hid
 [hidden]{display:none!important}
 #c{position:fixed;inset:0;display:block;width:100%;height:100%}
 #fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
-.hud{position:fixed;left:0;right:0;top:0;display:flex;flex-direction:column;align-items:center;gap:2px;
-  padding-top:calc(env(safe-area-inset-top,0px) + 18px);pointer-events:none;
+.hud{position:fixed;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;gap:2px;
+  padding-bottom:calc(env(safe-area-inset-bottom,0px) + 34px);pointer-events:none;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 #time{font-family:var(--display);font-size:56px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.01em}
 #pop{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;min-height:1em}
@@ -37,18 +37,28 @@ button{font:inherit;font-family:var(--display);font-size:20px;color:var(--bg);ba
   border-radius:999px;padding:14px 44px;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 button:active{transform:scale(.97)}
+.loc{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none;color:#d3def5;text-shadow:0 1px 8px rgba(4,8,22,.7)}
+.loc .place{display:flex;flex-direction:column;gap:2px}
+.loc h2{margin:0;font-family:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;font-weight:900;font-size:2.4rem;line-height:.9;letter-spacing:.02em;text-transform:uppercase}
+.loc .sub{font-size:.78rem;color:rgba(211,222,245,.58);letter-spacing:.06em}
+.loc .meter{text-align:right;display:flex;flex-direction:column;gap:2px;font-variant-numeric:tabular-nums}
+.loc .h{font-family:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;font-weight:700;font-size:1.9rem;line-height:.9;color:#ff8a3d}
+.loc .h small{font-size:.9rem;margin-left:2px}
+.loc .t{font-size:.74rem;color:rgba(211,222,245,.58);letter-spacing:.04em}
 #ver{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;pointer-events:none;z-index:5}
-#dir{position:fixed;right:max(14px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 18px);z-index:20;font-family:var(--body);font-size:12px;font-weight:600;color:var(--fg);background:rgba(244,244,246,.12);border:1px solid var(--faint);padding:8px 12px}
+#dir{position:fixed;right:max(14px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 82px);z-index:20;font-family:var(--body);font-size:12px;font-weight:600;color:var(--fg);background:rgba(244,244,246,.12);border:1px solid var(--faint);padding:8px 12px}
 #mode{position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:12px;color:var(--dim);pointer-events:none;
   padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 </style>
 
 <canvas id="c"></canvas>
 <canvas id="fx"></canvas>
+<div class="loc"><div class="place"><h2>Mong Kok</h2><span class="sub">旺角 · 홍콩 · 네이선 로드</span></div><div class="meter"><span class="h">320<small>m</small></span><span class="t">기울기 <span id="tiltv">0.0</span>°</span></div></div>
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.13</div>
+<div id="ver">v0.14</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -82,7 +92,7 @@ camera.up.set(0,0,-1);
 const camPos=new THREE.Vector3(0,TOP+10,0);
 // 시점: 1 = 수직으로 내려다봄, 2 = 더 높은 곳에서 대각선으로. 장대 끝은 항상 화면 좌 2/3, 위 2/3
 // shift: 소실점을 화면 중앙보다 얼마나 아래로 내릴지(화면 높이 비율)
-const VIEWS={1:{pitch:90,yaw:0,shift:.32,dist:7.5,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,fovP:74,fovL:60}};
+const VIEWS={1:{pitch:90,yaw:0,shift:.42,dist:13,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,fovP:74,fovL:60}};
 let view='2'; try{view=localStorage.getItem('pole-view')||'2'}catch(e){}
 const camOffset=new THREE.Vector3(), camQuat=new THREE.Quaternion();
 const scrR=new THREE.Vector3(1,0,0), scrD=new THREE.Vector3(0,0,1); // 화면 오른쪽·아래쪽이 땅 위에서 가리키는 방향
@@ -163,7 +173,7 @@ function buildMongkok(){
   MATS.push(['#86a5e0','#33508f','#a3bdee','#a3bdee','#6a8bcc','#2b4480'].map(c=>new THREE.MeshBasicMaterial({color:c}))); // 옥상 잡동사니
   const CLUT=MATS.length-1;
   MATS.forEach(a=>a.forEach(m=>m.vertexColors=true));
-  const shadeAt=y=>.38+.62*Math.min(1,Math.max(0,y)/250);   // 바닥 38% → 높이 250부터 100% 밝기
+  const shadeAt=y=>.15+.85*Math.min(1,Math.max(0,y)/250);   // 바닥 15% → 높이 250부터 100% 밝기
 
   // 건물은 재질·면별로 한 덩어리로 합쳐서 그리기 호출을 줄임
   const buckets={}, edgePos=[];
@@ -444,13 +454,14 @@ function showResult(){
 }
 
 // ---------- 루프 ----------
-let last=performance.now();
+let last=performance.now(), tiltT=0;
 function step(now){
   const dt=Math.min(.033,(now-last)/1000); last=now;
   if(state==='play') physics(dt);
   else if(state==='fall') falling(dt);
   else idle(now/1000);
   updateObs(dt);
+  tiltT+=dt; if(tiltT>.1){ tiltT=0; $('tiltv').textContent=(Math.hypot(tilt.x,tilt.z)*180/Math.PI).toFixed(1); }
   draw(dt);
   requestAnimationFrame(step);
 }
