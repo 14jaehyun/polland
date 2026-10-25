@@ -39,9 +39,6 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 button:active{transform:scale(.97)}
 #ver{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 14px);font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;pointer-events:none;z-index:5}
 #dir{position:fixed;right:max(14px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 18px);z-index:20;font-family:var(--body);font-size:12px;font-weight:600;color:var(--fg);background:rgba(244,244,246,.12);border:1px solid var(--faint);padding:8px 12px}
-.city{display:flex;gap:0;border:1px solid var(--faint);border-radius:999px;padding:3px}
-.city button{font-family:var(--body);font-size:14px;font-weight:600;background:transparent;color:var(--dim);padding:8px 22px}
-.city button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 #mode{position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:12px;color:var(--dim);pointer-events:none;
   padding-bottom:calc(env(safe-area-inset-bottom,0px) + 14px)}
 </style>
@@ -51,12 +48,11 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.08</div>
+<div id="ver">v0.09</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
-  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡고, 날아오는 방해물은 눌러서 터뜨리세요. 오른쪽 위 버튼으로 조작 방향을 바꿀 수 있어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
-  <div class="city" role="group" aria-label="도시"><button type="button" data-city="seoul">서울</button><button type="button" data-city="tokyo">도쿄</button></div>
+  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡고, 날아오는 방해물은 눌러서 터뜨리세요. 기울인 쪽(화면 기준)으로 장대가 휘어요. 오른쪽 위 버튼으로 시점을 바꿀 수 있어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
   <button id="go" type="button">시작</button>
   <p style="font-size:12px">화면 회전 잠금을 켜두면 좋아요</p>
 </div>
@@ -65,7 +61,6 @@ button:active{transform:scale(.97)}
   <div class="big" id="final">0.0</div>
   <p id="rec"></p>
   <p id="popres"></p>
-  <div class="city" role="group" aria-label="도시"><button type="button" data-city="seoul">서울</button><button type="button" data-city="tokyo">도쿄</button></div>
   <button id="again" type="button">다시</button>
 </div>
 
@@ -84,186 +79,171 @@ scene.background=new THREE.Color(0x050507);
 scene.fog=new THREE.FogExp2(0x050507,0.0075);
 const camera=new THREE.PerspectiveCamera(68,1,0.1,1000);
 camera.up.set(0,0,-1);
-const CAM_OFF=new THREE.Vector3(0,8.5,3.2), LOOK_OFF=new THREE.Vector3(0,-6,-1.2);
-const camPos=new THREE.Vector3(0,TOP+8.5,3.2), camLook=new THREE.Vector3(0,TOP-6,-1.2);
+const camPos=new THREE.Vector3(0,TOP+10,0);
+// 시점: 1 = 수직으로 내려다봄, 2 = 더 높은 곳에서 대각선으로. 장대 끝은 항상 화면 좌 2/3, 위 2/3
+// shift: 소실점을 화면 중앙보다 얼마나 아래로 내릴지(화면 높이 비율)
+const VIEWS={1:{pitch:90,yaw:0,shift:.32,dist:7.5,fovP:84,fovL:70},2:{pitch:56,yaw:-28,shift:0,dist:12,fovP:74,fovL:60}};
+let view='2'; try{view=localStorage.getItem('pole-view')||'2'}catch(e){}
+const camOffset=new THREE.Vector3(), camQuat=new THREE.Quaternion();
+const scrR=new THREE.Vector3(1,0,0), scrD=new THREE.Vector3(0,0,1); // 화면 오른쪽·아래쪽이 땅 위에서 가리키는 방향
+let cv=null;
+function viewTarget(){
+  const v=VIEWS[view], fov=innerWidth/innerHeight<.75?v.fovP:v.fovL;
+  return {pitch:v.pitch,yaw:v.yaw,shift:v.shift,dist:v.dist,fov};
+}
+function applyView(){
+  const D=Math.PI/180;
+  const w=innerWidth,h=innerHeight,fullH=h*(1+2*cv.shift);
+  camera.fov=cv.fov; camera.aspect=w/fullH;
+  camera.setViewOffset(w,fullH,0,0,w,h); camera.updateProjectionMatrix();
+  camQuat.setFromEuler(new THREE.Euler(-cv.pitch*D,cv.yaw*D,0,'YXZ'));
+  const tv=Math.tan(cv.fov*D/2), ny=1-2*(h*2/3)/fullH;
+  const ray=new THREE.Vector3(1/3*camera.aspect*tv,ny*tv,-1).applyQuaternion(camQuat).normalize();
+  camOffset.copy(ray).multiplyScalar(-cv.dist);
+  scrR.set(1,0,0).applyQuaternion(camQuat); scrR.y=0; scrR.normalize();
+  scrD.set(0,-1,0).applyQuaternion(camQuat); scrD.y=0; if(scrD.lengthSq()<1e-6) scrD.set(0,0,1); scrD.normalize();
+}
+cv=viewTarget(); applyView();
 
 scene.add(new THREE.HemisphereLight(0xffffff,0x202024,0.7));
 const sun=new THREE.DirectionalLight(0xffffff,0.9); sun.position.set(4,10,6); scene.add(sun);
 
-// ---------- 도시 (밤) ----------
+// ---------- 도시: 몽콕 (파란 고층 + 주황 거리) ----------
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function winTex(R,lit,cw,ch,density,dim){
-  const cv=document.createElement('canvas'); cv.width=64; cv.height=256;
-  const g=cv.getContext('2d'); g.fillStyle='#121218'; g.fillRect(0,0,64,256);
-  for(let y=3;y<256;y+=ch+3) for(let x=3;x<64;x+=cw+3){
-    const r=R(); if(r<density){g.fillStyle=r<density*.45?lit:dim;g.fillRect(x,y,cw,ch);}
-  }
-  const t=new THREE.CanvasTexture(cv); t.magFilter=THREE.NearestFilter; return t;
-}
 const cityGroup=new THREE.Group(); scene.add(cityGroup);
-let cityAnim=[]; // 매 프레임 움직이는 것들
-function instBoxes(list,mats,geo){
-  const im=new THREE.InstancedMesh(geo||new THREE.BoxGeometry(1,1,1),mats,list.length);
-  const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),p=new THREE.Vector3(),sc=new THREE.Vector3(),e=new THREE.Euler();
-  list.forEach((b,i)=>{e.set(0,b.ry||0,0);q.setFromEuler(e);p.set(b.x,(b.y||0)+b.h/2,b.z);sc.set(b.w,b.h,b.d);m4.compose(p,q,sc);im.setMatrixAt(i,m4);});
-  cityGroup.add(im); return im;
-}
-function dots(list,color,size,transparent){
-  const mat=new THREE.MeshBasicMaterial({color,transparent:!!transparent,fog:true});
-  const im=new THREE.InstancedMesh(new THREE.SphereGeometry(size,6,4),mat,Math.max(1,list.length));
-  const m4=new THREE.Matrix4(); list.forEach((p,i)=>{m4.makeTranslation(p.x,p.y,p.z);im.setMatrixAt(i,m4);});
-  im.count=list.length; cityGroup.add(im); return im;
-}
-function plane(w,d,x,z,y,color,ry){
-  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshBasicMaterial({color}));
-  m.rotation.set(-Math.PI/2,0,ry||0); m.position.set(x,y,z); cityGroup.add(m); return m;
-}
-function blinker(list){ const im=dots(list,0xff2a2a,.7,true); cityAnim.push(t=>{im.material.opacity=Math.sin(t*2.6)>.55?1:.12;}); }
-function traffic(lines){
-  // lines: {x0,z0,x1,z1,y,n,col,speed}
-  for(const L of lines){
-    const len=Math.hypot(L.x1-L.x0,L.z1-L.z0), off=[];
-    const R=rng(L.n*7+len|0); for(let i=0;i<L.n;i++) off.push(R());
-    const im=dots(off.map(()=>({x:0,y:0,z:0})),L.col,.45);
-    const m4=new THREE.Matrix4();
-    cityAnim.push(t=>{ for(let i=0;i<L.n;i++){ const u=((off[i]+t*L.speed/len)%1+1)%1;
-      m4.makeTranslation(L.x0+(L.x1-L.x0)*u,L.y,L.z0+(L.z1-L.z0)*u); im.setMatrixAt(i,m4);} im.instanceMatrix.needsUpdate=true; });
+const CITY_H=320;                       // 도시는 높이 320 기준으로 만들고 장대 높이에 맞춰 축소
+cityGroup.scale.setScalar(TOP/CITY_H);
+function buildMongkok(){
+  const R=rng(19971);
+  const FOG=0x1b2d63;
+  scene.background=new THREE.Color(FOG); scene.fog=new THREE.Fog(FOG,140,470);
+  const maxAni=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  function canvasTex(w,h,draw){
+    const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);
+    const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=maxAni;return t;
   }
-}
-function clearCity(){
-  cityGroup.traverse(o=>{ if(o.geometry)o.geometry.dispose(); });
-  while(cityGroup.children.length) cityGroup.remove(cityGroup.children[0]);
-  cityAnim=[];
-}
-function nearPole(x,z,r){return Math.hypot(x,z)<r}
+  const VARIANTS=[
+    {base:'#3f66b8',dark:'#1c3070',mid:'#2d4c98',lit:.16,line:'rgba(160,185,235,.35)',ac:'#9bb3e4'},
+    {base:'#4a72c2',dark:'#203676',mid:'#3456a3',lit:.10,line:'rgba(170,195,240,.32)',ac:'#a7bdea'},
+    {base:'#35599f',dark:'#18295f',mid:'#27417f',lit:.22,line:'rgba(140,165,220,.30)',ac:'#8aa2d6'},
+    {base:'#5579bf',dark:'#25397a',mid:'#3c5ba6',lit:.08,line:'rgba(180,200,240,.35)',ac:'#b4c6ec'},
+    {base:'#c0532c',dark:'#5e2212',mid:'#8a3519',lit:.18,line:'rgba(255,190,150,.30)',ac:'#e9a184'}
+  ];
+  function facadeTex(v){
+    return canvasTex(128,192,(g,w,h)=>{
+      g.fillStyle=v.base;g.fillRect(0,0,w,h);
+      for(let i=0;i<16;i++){g.fillStyle='rgba(8,16,46,'+(0.05+R()*0.14)+')';g.fillRect(R()*w,R()*h,2+R()*6,24+R()*90)}
+      const cols=4,rows=6,cw=w/cols,rh=h/rows;
+      for(let r=0;r<rows;r++){
+        g.fillStyle=v.line;g.fillRect(0,r*rh,w,2);
+        for(let c=0;c<cols;c++){
+          const x=c*cw+5,y=r*rh+7,ww=cw-10,hh=rh-15;
+          g.fillStyle='rgba(6,12,34,.6)';g.fillRect(x-1.5,y-1.5,ww+3,hh+3);
+          const p=R();
+          g.fillStyle=p<v.lit?(R()<.5?'#ff8a3d':'#ffbd6b'):(p<v.lit+.4?v.dark:v.mid);
+          g.fillRect(x,y,ww,hh);
+          if(R()<.4){g.fillStyle=v.ac;g.fillRect(x+ww-9,y+hh+1.5,10,6)}
+        }
+      }
+    });
+  }
+  const roofTex=canvasTex(64,64,(g,w,h)=>{
+    g.fillStyle='#6a8ed2';g.fillRect(0,0,w,h);
+    for(let i=0;i<10;i++){const s=4+R()*12;g.fillStyle=R()<.5?'#86a6e2':'#4d6fb3';g.fillRect(R()*(w-s),R()*(h-s),s,s*(0.6+R()))}
+    g.strokeStyle='#2c4686';g.lineWidth=4;g.strokeRect(2,2,w-4,h-4);
+  });
+  roofTex.wrapS=roofTex.wrapT=THREE.ClampToEdgeWrapping;
+  const SHADE=[1.0,.56,1,1,.8,.5];
+  const MATS=VARIANTS.map((v,vi)=>{
+    const t=facadeTex(v), warm=vi===4;
+    return SHADE.map((s,i)=>(i===2||i===3)
+      ? new THREE.MeshBasicMaterial({map:roofTex,color:new THREE.Color(warm?1.15:1,warm?.75:1,warm?.6:1)})
+      : new THREE.MeshBasicMaterial({map:t,color:new THREE.Color(s,s,s)}));
+  });
+  MATS.push(['#86a5e0','#33508f','#a3bdee','#a3bdee','#6a8bcc','#2b4480'].map(c=>new THREE.MeshBasicMaterial({color:c}))); // 옥상 잡동사니
+  const CLUT=MATS.length-1;
 
-function buildSeoul(){
-  const R=rng(20261025);
-  scene.background.set(0x05070c); scene.fog.color.set(0x05070c);
-  plane(900,900,0,0,0,0x0a0b10);
-  // 한강: z 26~66
-  const RZ0=26,RZ1=66, inRiver=z=>z>RZ0-6&&z<RZ1+6;
-  plane(900,RZ1-RZ0,0,(RZ0+RZ1)/2,.3,0x070a12);
-  // 강변북로·올림픽대로 차량 불빛
-  traffic([{x0:-200,z0:RZ0-3,x1:200,z1:RZ0-3,y:1,n:70,col:0xfff1d6,speed:14},{x0:200,z0:RZ0-5,x1:-200,z1:RZ0-5,y:1,n:70,col:0xff3b30,speed:14},
-           {x0:-200,z0:RZ1+3,x1:200,z1:RZ1+3,y:1,n:70,col:0xff3b30,speed:16},{x0:200,z0:RZ1+5,x1:-200,z1:RZ1+5,y:1,n:70,col:0xfff1d6,speed:16}]);
-  // 다리
-  const bridges=[-115,-55,10,75,135], bl=[];
-  for(const bx of bridges){
-    instBoxes([{x:bx,z:(RZ0+RZ1)/2,w:6,d:RZ1-RZ0+10,h:1.2,y:6}],new THREE.MeshBasicMaterial({color:0x2a2b33}));
-    for(let z=RZ0-4;z<=RZ1+4;z+=2.5){bl.push({x:bx-3.2,y:8,z},{x:bx+3.2,y:8,z});}
-    traffic([{x0:bx-1.2,z0:RZ0-8,x1:bx-1.2,z1:RZ1+8,y:7.8,n:6,col:0xfff1d6,speed:12},{x0:bx+1.2,z0:RZ1+8,x1:bx+1.2,z1:RZ0-8,y:7.8,n:6,col:0xff3b30,speed:12}]);
+  // 건물은 재질·면별로 한 덩어리로 합쳐서 그리기 호출을 줄임
+  const buckets={}, edgePos=[];
+  function addBox(mi,w,h,d,x,y,z,tile){
+    const g=new THREE.BoxGeometry(w,h,d);
+    if(tile){const uv=g.attributes.uv;
+      for(let f=0;f<6;f++){let su=1,sv=1;if(f<2){su=d/12;sv=h/18}else if(f>=4){su=w/12;sv=h/18}
+        for(let i=0;i<4;i++){const k=f*4+i;uv.setXY(k,uv.getX(k)*su,uv.getY(k)*sv)}}}
+    g.translate(x,y+h/2,z);
+    const P=g.attributes.position.array,U=g.attributes.uv.array,I=g.index.array;
+    for(let f=0;f<6;f++){
+      const b=buckets[mi+'_'+f]||(buckets[mi+'_'+f]={mi,f,p:[],u:[]});
+      for(let j=0;j<6;j++){const k=I[f*6+j];b.p.push(P[k*3],P[k*3+1],P[k*3+2]);b.u.push(U[k*2],U[k*2+1])}
+    }
+    const e=new THREE.EdgesGeometry(g),ep=e.attributes.position.array;
+    for(let i=0;i<ep.length;i++)edgePos.push(ep[i]);
+    e.dispose();g.dispose();
   }
-  dots(bl,0xfff6e5,.35);
-  // 남산 + N서울타워
-  const NX=-40,NZ=-90;
-  const hill=new THREE.Mesh(new THREE.SphereGeometry(1,24,12,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0x0b100d}));
-  hill.scale.set(42,48,36); hill.position.set(NX,0,NZ); cityGroup.add(hill);
-  const ty=48;
-  const tw=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.6,38,10),new THREE.MeshBasicMaterial({color:0xd8dce6})); tw.position.set(NX,ty+19,NZ); cityGroup.add(tw);
-  const pod=new THREE.Mesh(new THREE.CylinderGeometry(3.6,3.2,5,16),new THREE.MeshBasicMaterial({color:0xffffff})); pod.position.set(NX,ty+33,NZ); cityGroup.add(pod);
-  const ant=new THREE.Mesh(new THREE.CylinderGeometry(.3,.5,16,6),new THREE.MeshBasicMaterial({color:0xaab0bd})); ant.position.set(NX,ty+44,NZ); cityGroup.add(ant);
-  blinker([{x:NX,y:ty+52,z:NZ}]);
-  const onHill=(x,z)=>((x-NX)/48)**2+((z-NZ)/42)**2<1;
-  // 롯데월드타워 (강 건너)
-  const LX=45,LZ=112;
-  const lt=new THREE.Mesh(new THREE.CylinderGeometry(1,10,178,4,1),new THREE.MeshBasicMaterial({map:winTex(rng(3),'#eef2ff',2,1,.5,'rgba(220,228,255,.35)')}));
-  lt.material.map.repeat.set(3,20); lt.material.map.wrapS=lt.material.map.wrapT=THREE.RepeatWrapping;
-  lt.rotation.y=Math.PI/4; lt.position.set(LX,89,LZ); cityGroup.add(lt);
-  blinker([{x:LX,y:179,z:LZ}]);
-  // 아파트 단지: 같은 높이 판상형이 줄지어
-  const aptTex=winTex(rng(5),'#ffe2b0',5,3,.85,'rgba(255,214,160,.45)');
-  const aptMat=new THREE.MeshBasicMaterial({map:aptTex}), roof=new THREE.MeshBasicMaterial({color:0x22232a});
-  const apts=[], others=[], used=[];
-  const free=(x,z,r)=>!inRiver(z)&&!nearPole(x,z,r+8)&&!onHill(x,z)&&Math.hypot(x-LX,z-LZ)>r+12&&used.every(u=>Math.hypot(u.x-x,u.z-z)>u.r+r);
-  for(let c=0;c<70;c++){
-    const cx=(R()-.5)*320, cz=(R()-.5)*320, rows=3+(R()*3|0), cols=2+(R()*2|0);
-    const rad=Math.max(rows*9,cols*16);
-    if(!free(cx,cz,rad)) continue; used.push({x:cx,z:cz,r:rad});
-    const ang=(R()-.5)*.5, h=38+R()*42;
-    for(let r=0;r<rows;r++) for(let k=0;k<cols;k++){
-      const lx=(k-(cols-1)/2)*30, lz=(r-(rows-1)/2)*17;
-      apts.push({x:cx+lx*Math.cos(ang)+lz*Math.sin(ang), z:cz-lx*Math.sin(ang)+lz*Math.cos(ang), w:24, d:5.5, h:h+(R()-.5)*4, ry:ang});
+  const signs=[];
+  const ROAD_X=17,ROAD_Z=12,STEP=18;
+  for(let cx=-189;cx<=189;cx+=STEP){
+    for(let cz=-531;cz<=261;cz+=STEP){
+      if(Math.abs(cx)<ROAD_X+6||Math.abs(cz)<ROAD_Z+6)continue;
+      const dist=Math.hypot(cx,cz);
+      const w=11+R()*5,d=11+R()*5;
+      let h=dist<90?170+R()*110:(dist<200?120+R()*120:85+R()*110);
+      if(R()<.12)h+=40;
+      h=Math.min(h,290);
+      const x=cx+(R()-.5)*3,z=cz+(R()-.5)*3;
+      addBox(R()<.09?4:(R()*4|0),w,h,d,x,0,z,true);
+      const n=R()<.65?1+(R()*3|0):0;
+      for(let i=0;i<n;i++){
+        const cw=1.5+R()*3.5,ch=1.2+R()*3,cd=1.5+R()*3.5;
+        addBox(CLUT,cw,ch,cd,x+(R()-.5)*(w-cw),h,z+(R()-.5)*(d-cd),false);
+      }
+      if(Math.abs(cx)<ROAD_X+6+STEP){
+        const face=cx>0?x-w/2:x+w/2,dir=cx>0?-1:1,k=2+(R()*5|0);
+        for(let i=0;i<k;i++){const len=3+R()*5;signs.push({x:face+dir*len/2,y:5+R()*45,z:z+(R()-.5)*(d-2),sx:len,sy:2+R()*5,sz:1.1})}
+      }
+      if(Math.abs(cz)<ROAD_Z+6+STEP){
+        const face=cz>0?z-d/2:z+d/2,dir=cz>0?-1:1,k=1+(R()*4|0);
+        for(let i=0;i<k;i++){const len=3+R()*4;signs.push({x:x+(R()-.5)*(w-2),y:5+R()*35,z:face+dir*len/2,sx:1.1,sy:2+R()*4,sz:len})}
+      }
     }
   }
-  instBoxes(apts,[aptMat,aptMat,roof,roof,aptMat,aptMat]);
-  // 상가·업무 빌딩
-  const offTex=winTex(rng(7),'#f2f5ff',4,4,.55,'rgba(230,236,255,.4)');
-  const offMat=new THREE.MeshBasicMaterial({map:offTex});
-  const crosses=[], av=[];
-  for(let i=0;i<900&&others.length<380;i++){
-    const x=(R()-.5)*320, z=(R()-.5)*320, w=5+R()*9, d=5+R()*9;
-    if(!free(x,z,Math.max(w,d)*.7)) continue; used.push({x,z,r:Math.max(w,d)*.6});
-    const center=Math.hypot(x,z)<70, h=center&&R()<.5?60+R()*95:10+R()*30;
-    others.push({x,z,w,d,h});
-    if(h<34&&R()<.12) crosses.push({x,z,y:h});
-    if(h>85) av.push({x,y:h+.8,z});
+  for(const key in buckets){
+    const b=buckets[key],g=new THREE.BufferGeometry();
+    g.setAttribute('position',new THREE.Float32BufferAttribute(b.p,3));
+    g.setAttribute('uv',new THREE.Float32BufferAttribute(b.u,2));
+    cityGroup.add(new THREE.Mesh(g,MATS[b.mi][b.f]));
   }
-  instBoxes(others,[offMat,offMat,roof,roof,offMat,offMat]);
-  // 빨간 십자가
-  const cmat=new THREE.MeshBasicMaterial({color:0xff2b2b});
-  instBoxes(crosses.map(c=>({x:c.x,z:c.z,y:c.y,w:.9,h:8,d:.9})),cmat);
-  instBoxes(crosses.map(c=>({x:c.x,z:c.z,y:c.y+4.2,w:5,h:.9,d:.9})),cmat);
-  blinker(av);
-}
+  const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute(edgePos,3));
+  cityGroup.add(new THREE.LineSegments(eg,new THREE.LineBasicMaterial({color:0x060c22,transparent:true,opacity:.9})));
 
-function buildTokyo(){
-  const R=rng(19580101);
-  scene.background.set(0x07060a); scene.fog.color.set(0x07060a);
-  plane(900,900,0,0,0,0x0b0a0e);
-  // 스미다강: 구불구불 세로로
-  const rx=z=>70+Math.sin(z/45)*22, inRiver=(x,z)=>Math.abs(x-rx(z))<16;
-  for(let z=-220;z<220;z+=8){ plane(24,9,rx(z),z,.3,0x08090f,-Math.atan(Math.cos(z/45)*22/45)); }
-  // 고가 순환 전철
-  const LR=92;
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(LR,.9,4,160),new THREE.MeshBasicMaterial({color:0x2c2c34}));
-  ring.rotation.x=Math.PI/2; ring.position.y=11; cityGroup.add(ring);
-  const pil=[]; for(let a=0;a<Math.PI*2;a+=Math.PI/40) pil.push({x:Math.cos(a)*LR,z:Math.sin(a)*LR,w:1,d:1,h:11});
-  instBoxes(pil,new THREE.MeshBasicMaterial({color:0x1c1c22}));
-  const carMat=new THREE.MeshBasicMaterial({color:0xd9ffe8}), cars=60;
-  const trains=new THREE.InstancedMesh(new THREE.BoxGeometry(2.2,2.2,5.6),carMat,cars); cityGroup.add(trains);
-  const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),p=new THREE.Vector3(),sc=new THREE.Vector3(1,1,1),e=new THREE.Euler();
-  cityAnim.push(t=>{ for(let i=0;i<cars;i++){ const tr=i/10|0, k=i%10;
-      const a=(tr*Math.PI/3)+t*.06*(tr%2?1:-1)+(k*6.2/LR)*(tr%2?-1:1);
-      p.set(Math.cos(a)*(LR+(tr%2?1.4:-1.4)),13,Math.sin(a)*(LR+(tr%2?1.4:-1.4))); e.set(0,-a,0); q.setFromEuler(e);
-      m4.compose(p,q,sc); trains.setMatrixAt(i,m4);} trains.instanceMatrix.needsUpdate=true; });
-  // 도쿄타워
-  const TX=-28,TZ=78;
-  const tt=new THREE.Mesh(new THREE.ConeGeometry(11,135,4,6,true),new THREE.MeshBasicMaterial({color:0xff6a1a,wireframe:true}));
-  tt.position.set(TX,67.5,TZ); tt.rotation.y=Math.PI/4; cityGroup.add(tt);
-  const tc=new THREE.Mesh(new THREE.ConeGeometry(10,128,4),new THREE.MeshBasicMaterial({color:0xb8430c,transparent:true,opacity:.55}));
-  tc.position.set(TX,64,TZ); tc.rotation.y=Math.PI/4; cityGroup.add(tc);
-  for(const [y,s] of [[40,8],[78,4.6]]){const dk=new THREE.Mesh(new THREE.BoxGeometry(s,2.4,s),new THREE.MeshBasicMaterial({color:0xfff0dc}));dk.position.set(TX,y,TZ);cityGroup.add(dk);}
-  blinker([{x:TX,y:136,z:TZ}]);
-  // 스카이트리
-  const SX=48,SZ=-118;
-  const sk=new THREE.Mesh(new THREE.CylinderGeometry(1.2,6,192,12),new THREE.MeshBasicMaterial({color:0x9fb4d8,transparent:true,opacity:.8}));
-  sk.position.set(SX,96,SZ); cityGroup.add(sk);
-  for(const [y,r] of [[115,5],[160,3.4]]){const rg=new THREE.Mesh(new THREE.CylinderGeometry(r,r,3,20),new THREE.MeshBasicMaterial({color:0xeaf6ff}));rg.position.set(SX,y,SZ);cityGroup.add(rg);}
-  blinker([{x:SX,y:193,z:SZ}]);
-  // 빽빽한 건물들, 길이 제각각이라 살짝씩 틀어짐
-  const t1=winTex(rng(9),'#f4f7ff',3,2,.6,'rgba(220,240,255,.4)'), t2=winTex(rng(13),'#fff0d8',3,3,.5,'rgba(255,230,200,.35)');
-  const m1=new THREE.MeshBasicMaterial({map:t1}), m2=new THREE.MeshBasicMaterial({map:t2}), roof=new THREE.MeshBasicMaterial({color:0x26242c});
-  const A=[],B=[],av=[],used=[];
-  const free=(x,z,r)=>!inRiver(x,z)&&!nearPole(x,z,r+7)&&Math.abs(Math.hypot(x,z)-LR)>r+3&&Math.hypot(x-TX,z-TZ)>r+12&&Math.hypot(x-SX,z-SZ)>r+8&&used.every(u=>Math.hypot(u.x-x,u.z-z)>u.r+r);
-  for(let i=0;i<4000&&(A.length+B.length)<820;i++){
-    const x=(R()-.5)*330, z=(R()-.5)*330, w=3.5+R()*7, d=3.5+R()*7, r=Math.max(w,d)*.55;
-    if(!free(x,z,r)) continue; used.push({x,z,r});
-    const shin=Math.hypot(x+60,z+40)<45, h=shin?55+R()*100:(R()<.08?35+R()*40:6+R()*24);
-    (R()<.6?A:B).push({x,z,w,d,h,ry:(R()-.5)*.35});
-    if(h>75) av.push({x,y:h+.8,z});
+  const SIGNC=['#ff7a33','#ff4d3d','#ffd08a','#ff9a4a','#ffe6c2','#ff5f2e'].map(c=>new THREE.Color(c));
+  const sm=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0xffffff}),signs.length);
+  const o=new THREE.Object3D();
+  signs.forEach((s,i)=>{o.position.set(s.x,s.y,s.z);o.scale.set(s.sx,s.sy,s.sz);o.updateMatrix();sm.setMatrixAt(i,o.matrix);sm.setColorAt(i,SIGNC[(R()*SIGNC.length)|0])});
+  cityGroup.add(sm);
+
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshBasicMaterial({color:0x6a2f1e}));
+  ground.rotation.x=-Math.PI/2;ground.position.z=-150;cityGroup.add(ground);
+  const roadTex=canvasTex(64,256,(g,w,h)=>{
+    const gr=g.createLinearGradient(0,0,w,0);
+    gr.addColorStop(0,'#7a2a18');gr.addColorStop(.12,'#c24c22');gr.addColorStop(.2,'#ff8f45');
+    gr.addColorStop(.5,'#ffc074');gr.addColorStop(.8,'#ff8f45');gr.addColorStop(.88,'#c24c22');gr.addColorStop(1,'#7a2a18');
+    g.fillStyle=gr;g.fillRect(0,0,w,h);
+    g.fillStyle='rgba(255,240,210,.8)';for(let y=0;y<h;y+=32)g.fillRect(w/2-1,y,2,14);
+    for(let i=0;i<46;i++){g.fillStyle=R()<.5?'#fff1d0':'#5a1d10';const lane=R()<.5?.33:.62;g.fillRect(w*lane+(R()-.5)*6,R()*h,4,8+R()*5)}
+  });
+  function road(len,width,rotY,cx,cz){
+    const t=roadTex.clone();t.needsUpdate=true;t.repeat.set(1,len/70);
+    const g=new THREE.PlaneGeometry(width,len);g.rotateX(-Math.PI/2);if(rotY)g.rotateY(rotY);
+    const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:t}));m.position.set(cx,.15,cz);cityGroup.add(m);
+    const gl=new THREE.Mesh(g.clone(),new THREE.MeshBasicMaterial({color:0xff7a30,transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    gl.scale.set(rotY?1:1.6,1,rotY?1.6:1);gl.position.set(cx,4,cz);cityGroup.add(gl);
   }
-  instBoxes(A,[m1,m1,roof,roof,m1,m1]); instBoxes(B,[m2,m2,roof,roof,m2,m2]);
-  // 간판 불빛 (주황 한 색)
-  const signs=[]; for(const b of B) if(b.h<30&&R()<.18) signs.push({x:b.x+b.w*.5,z:b.z,y:b.h*.4,w:.4,h:b.h*.5,d:1.4});
-  instBoxes(signs,new THREE.MeshBasicMaterial({color:0xff7a2a}));
-  blinker(av);
+  road(820,ROAD_X*2+4,0,0,-140);
+  road(420,ROAD_Z*2+4,Math.PI/2,0,0);
 }
-let cityName='seoul'; try{cityName=localStorage.getItem('pole-city')||'seoul'}catch(e){}
-function buildCity(){ clearCity(); (cityName==='tokyo'?buildTokyo:buildSeoul)();
-  document.querySelectorAll('.city button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.city===cityName)); }
-
-buildCity();
+buildMongkok();
+const cityAnim=[];
 
 
 // 장대
@@ -322,7 +302,7 @@ let streaks=[];
 
 function resize(){
   const w=innerWidth,h=innerHeight;
-  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w,h,false); cv=viewTarget(); applyView();
   fx.width=w*devicePixelRatio; fx.height=h*devicePixelRatio; g2.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
 }
 addEventListener('resize',resize); resize();
@@ -333,10 +313,11 @@ const obMat=new THREE.MeshStandardMaterial({color:0xf4f4f6,roughness:.4,emissive
 const bitGeo=new THREE.TetrahedronGeometry(.14,0);
 let obs=[], bits=[], popped=0, obNext=0;
 function spawnOb(){
-  const a=Math.random()*Math.PI*2, R=16;
+  // 화면 기준 각도 45°(오른쪽 위)~225°(왼쪽 아래): 오른쪽·아래쪽에서는 안 나옴
+  const a=(45+Math.random()*180)*Math.PI/180, R=cv.dist*1.6, ca=Math.cos(a), sa=Math.sin(a);
   const m=new THREE.Mesh(obGeo,obMat);
-  m.position.set(top.x+Math.cos(a)*R, top.y+1+Math.random()*2.5, top.z+Math.sin(a)*R);
-  const sp=2.6+Math.random()*1.8+Math.min(t,120)*.012;
+  m.position.set(top.x+(ca*scrR.x-sa*scrD.x)*R, top.y+1+Math.random()*2.5, top.z+(ca*scrR.z-sa*scrD.z)*R);
+  const sp=(2.6+Math.random()*1.8+Math.min(t,120)*.012)*R/16;
   obs.push({m,sp,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
   scene.add(m);
 }
@@ -390,11 +371,10 @@ function tapOb(x,y){
 
 // ---------- 입력 ----------
 let ori=null, base=null, gotOri=false;
-let dir='fwd'; try{dir=localStorage.getItem('pole-dir')||'fwd'}catch(e){}
-function showDir(){$('dir').textContent=dir==='fwd'?'순방향 · 기울인 쪽으로':'역방향 · 기울인 반대쪽으로';}
+function showView(){$('dir').textContent=view==='1'?'시점 1 · 수직':'시점 2 · 대각선';}
 $('dir').addEventListener('pointerdown',e=>e.stopPropagation());
-$('dir').onclick=()=>{dir=dir==='fwd'?'rev':'fwd';try{localStorage.setItem('pole-dir',dir)}catch(e){}showDir();};
-showDir();
+$('dir').onclick=()=>{view=view==='1'?'2':'1';try{localStorage.setItem('pole-view',view)}catch(e){}showView();};
+showView();
 let touchStart=null, touchVec={x:0,y:0};
 const keys={};
 addEventListener('deviceorientation',e=>{
@@ -412,8 +392,7 @@ function readTilt(){
   if(gotOri&&ori&&base){
     let gx=(ori.g-base.g), bz=(ori.b-base.b);
     const d=Math.PI/180;
-    const sg=dir==='fwd'?1:-1;
-    return {x:clamp(sg*gx*d,-MAXT,MAXT), z:clamp(sg*bz*d,-MAXT,MAXT)};
+    return {x:clamp(gx*d,-MAXT,MAXT), z:clamp(bz*d,-MAXT,MAXT)};
   }
   let x=0,z=0;
   if(touchStart){x=touchVec.x/110*MAXT; z=touchVec.y/110*MAXT;}
@@ -444,9 +423,8 @@ function reset(){
   clearObs(); popped=0; obNext=0; $('pop').textContent='';
   t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
-  bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(CAM_OFF); camLook.copy(top).add(LOOK_OFF);
+  bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
 }
-document.querySelectorAll('.city button').forEach(b=>b.onclick=()=>{cityName=b.dataset.city;try{localStorage.setItem('pole-city',cityName)}catch(e){}buildCity();});
 $('go').onclick=begin; $('again').onclick=begin;
 
 function gameOver(){
@@ -472,7 +450,6 @@ function step(now){
   else if(state==='fall') falling(dt);
   else idle(now/1000);
   updateObs(dt);
-  const ct=now/1000; for(const f of cityAnim) f(ct);
   draw(dt);
   requestAnimationFrame(step);
 }
@@ -496,8 +473,11 @@ function physics(dt){
       if(Math.random()<wind.w*1.6) streaks.push({x:wind.x>0?-40:innerWidth+40,y:Math.random()*innerHeight,dx:Math.sign(wind.x)||1,dy:wind.z/wind.w*.25,l:30+wind.w*200,life:1,a:.15+wind.w});
     }
   }
+  // 조작·바람은 화면 기준 → 땅 위 방향으로 바꿈 (시점이 바뀌어도 기울인 화면 쪽으로 휨)
+  const sx=c*phi.x+wx, sz=c*phi.z+wz;
+  const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
   for(const a of ['x','z']){
-    const acc=k*th[a]*(1+th[a]*th[a]) + c*phi[a] + (a==='x'?wx:wz) + (Math.random()-.5)*jit - damp*om[a];
+    const acc=k*th[a]*(1+th[a]*th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
   }
   if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
@@ -508,9 +488,13 @@ function physics(dt){
 function placeMan(){ man.position.copy(top); man.rotation.set(tilt.z,0,-tilt.x); }
 function followCam(dt){
   // 카메라가 꼭대기를 늦게 따라가서 휘청임이 화면에 보이게
+  // 시점 전환은 1~2초에 걸쳐 고개를 돌리듯
+  const T=viewTarget(), b=Math.min(1,dt*2.2);
+  for(const key in T) cv[key]+=(T[key]-cv[key])*b;
+  applyView();
   const r=Math.min(1,dt*1.2);
-  camPos.lerp(top.clone().add(CAM_OFF),r); camLook.lerp(top.clone().add(LOOK_OFF),r);
-  camera.position.copy(camPos); camera.lookAt(camLook);
+  camPos.lerp(top.clone().add(camOffset),r);
+  camera.position.copy(camPos); camera.quaternion.copy(camQuat);
 }
 function pose(flail){
   const v=Math.hypot(om.x,om.z), lean=Math.hypot(th.x,th.z);
