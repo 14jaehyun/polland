@@ -48,7 +48,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.14</div>
+<div id="ver">v0.13</div>
 
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
@@ -163,7 +163,7 @@ function buildMongkok(){
   MATS.push(['#86a5e0','#33508f','#a3bdee','#a3bdee','#6a8bcc','#2b4480'].map(c=>new THREE.MeshBasicMaterial({color:c}))); // 옥상 잡동사니
   const CLUT=MATS.length-1;
   MATS.forEach(a=>a.forEach(m=>m.vertexColors=true));
-  const shadeAt=y=>.15+.85*Math.min(1,Math.max(0,y)/250);   // 바닥 15% → 높이 250부터 100% 밝기
+  const shadeAt=y=>.38+.62*Math.min(1,Math.max(0,y)/250);   // 바닥 38% → 높이 250부터 100% 밝기
 
   // 건물은 재질·면별로 한 덩어리로 합쳐서 그리기 호출을 줄임
   const buckets={}, edgePos=[];
