@@ -79,8 +79,8 @@ if a.tear:   # 뒷판용 그림: 둘레보다 확 가까운 것(탑·앞 빌딩)
         fill = cv2.inpaint(cv2.resize(bgr, (W // small, H // small)), cv2.resize(m, (W // small, H // small)), 12, cv2.INPAINT_TELEA)
         fill = cv2.resize(fill, (W, H), interpolation=cv2.INTER_CUBIC)
     out = np.where(m[..., None] > 0, fill, bgr)
-    cv2.imwrite(os.path.join(a.out, a.id + '_bg.jpg'), out, [cv2.IMWRITE_JPEG_QUALITY, 85])
-    extra['bg'] = 1
+    bp = os.path.join(a.out, a.id + '_bg.jpg'); cv2.imwrite(bp, out, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    import hashlib as _h; extra['bg'] = _h.md5(open(bp, 'rb').read()).hexdigest()[:8]   # 뒷판 그림 버전 (바뀌면 새로 받게)
 import hashlib; ver = hashlib.md5(open(os.path.join(a.out, a.id + '.jpg'), 'rb').read()).hexdigest()[:8]   # 그림이 바뀌면 브라우저가 새로 받게
 json.dump({'id': a.id, 'name': a.name, 'sub': a.sub, 'nx': NX, 'ny': NY, 'vd': base64.b64encode(vd.tobytes()).decode(),
            'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'ver': ver, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH], **({'tear': a.tear, 'tearR': a.tearR} if a.tear else {}), **extra},

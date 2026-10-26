@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.44 · city_play</div>
+<div id="ver">v0.45 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -155,7 +155,7 @@ function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15
   const paintG=new THREE.Group(); paintG.quaternion.copy(qP); paintG.position.copy(T0).sub(T0.clone().applyQuaternion(qP)); PGi.add(paintG);
   const rmat=new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,fog:false});
   if(geoB){ let bm=rmat;
-    if(CD.bg){const bi=new Image(),bt=new THREE.Texture(bi);bi.onload=()=>{bt.needsUpdate=true;};bi.src=CD.img.replace(/\.jpg/,'_bg.jpg');bt.anisotropy=tex.anisotropy;bm=new THREE.MeshBasicMaterial({map:bt,side:THREE.DoubleSide,fog:false});}
+    if(CD.bg){const bi=new Image(),bt=new THREE.Texture(bi);bi.onload=()=>{bt.needsUpdate=true;};bi.src='../city/'+CD.id+'_bg.jpg?v='+CD.bg;bt.anisotropy=tex.anisotropy;bm=new THREE.MeshBasicMaterial({map:bt,side:THREE.DoubleSide,fog:false});}
     backMesh=new THREE.Mesh(geoB,bm); paintG.add(backMesh);}
   reliefMesh=new THREE.Mesh(geo,rmat); paintG.add(reliefMesh);
 }
