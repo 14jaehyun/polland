@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.55 · city_play</div>
+<div id="ver">v0.56 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -409,7 +409,10 @@ $('go').onclick=begin; $('again').onclick=begin;
 const FEND=2.0;
 function gameOver(){
   state='fall'; clearObs();
-  fall={time:0,th0:{x:th.x,z:th.z},v:new THREE.Vector3()};
+  // 화면 속 '진짜 아래'(도시 기준 아래) 방향: 장대가 기운 만큼 장대 축에서 바깥으로 벗어나 있음 → 그쪽으로 미끄러져 떨어지면 장대를 안 뚫음
+  const down=new THREE.Vector3(0,-1,0).applyQuaternion(PG.quaternion), pax=new THREE.Vector3(0,1,0).applyQuaternion(qA);
+  const out=down.clone().addScaledVector(pax,-down.dot(pax)); if(out.lengthSq()<1e-4) out.copy(scrR); out.normalize();
+  fall={time:0,th0:{x:th.x,z:th.z},down,v:out.clone().multiplyScalar(2.6).addScaledVector(pax,.6),tip:new THREE.Vector3().crossVectors(pax,out).normalize()};
 }
 function showResult(){
   document.body.classList.remove('playing');
@@ -512,7 +515,8 @@ function pose(flail){
 function falling(dt){
   const F=fall; F.time+=dt; const T=F.time;
   // 화면에 고정된 세상 기준으로 아래로 떨어짐 (도시 판에 붙이면 판이 튕겨 돌 때 사람이 순간이동해서 사라져 보였음)
-  F.v.y-=14*dt; man.position.addScaledVector(F.v,dt);
+  F.v.addScaledVector(F.down,14*dt); man.position.addScaledVector(F.v,dt);
+  if(T<.6) man.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(F.tip,dt*2.2));   // 가장자리에서 바깥으로 넘어가며 기울어짐
   const r=Math.exp(-T/.45)*Math.cos(T*7);   // 장대 튕겨 올라옴
   th.x=F.th0.x*r; th.z=F.th0.z*r; bendPole(th.x,th.z); followCam(dt);
   if(T>FEND&&state==='fall') showResult();
