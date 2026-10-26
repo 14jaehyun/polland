@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.54 · city_play</div>
+<div id="ver">v0.55 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -410,7 +410,6 @@ const FEND=2.0;
 function gameOver(){
   state='fall'; clearObs();
   fall={time:0,th0:{x:th.x,z:th.z},v:new THREE.Vector3()};
-  PG.attach(man);   // 도시 쪽 세상에 붙여서 도시 기준 아래로 떨어지게 (장대가 튕겨도 사람은 제자리에서 떨어짐)
 }
 function showResult(){
   document.body.classList.remove('playing');
@@ -488,9 +487,9 @@ function physics(dt){
   // 13°에서 더 기울지 않음 (닿아도 죽지 않음, 바깥으로 가던 속도만 멈춤)
   let thm=Math.hypot(th.x,th.z); const TH13=Math.tan(13*Math.PI/180)*TOP/SWAY;
   if(thm>TH13){ const ux=th.x/thm,uz=th.z/thm; th.x=ux*TH13; th.z=uz*TH13; const vo=om.x*ux+om.z*uz; if(vo>0){ om.x-=vo*ux; om.z-=vo*uz; } thm=TH13; }
-  // 10°를 넘으면 1.5초 유예: 그 안에 10° 안으로 돌아오면 생존(초기화), 못 돌아오면 떨어짐
+  // 10°를 넘으면 0.7초 유예: 그 안에 10° 안으로 돌아오면 생존(초기화), 못 돌아오면 떨어짐
   const dgn=Math.atan(thm*SWAY/TOP)*180/Math.PI;
-  if(dgn>10){ over+=dt; if(over>1.5) gameOver(); } else over=0;
+  if(dgn>10){ over+=dt; if(over>.7) gameOver(); } else over=0;
   $('time').textContent=t.toFixed(1);
   bendPole(th.x,th.z); placeMan(); pose(1);
   followCam(dt);
@@ -512,7 +511,8 @@ function pose(flail){
 }
 function falling(dt){
   const F=fall; F.time+=dt; const T=F.time;
-  F.v.y-=30*dt; man.position.addScaledVector(F.v,dt);
+  // 화면에 고정된 세상 기준으로 아래로 떨어짐 (도시 판에 붙이면 판이 튕겨 돌 때 사람이 순간이동해서 사라져 보였음)
+  F.v.y-=14*dt; man.position.addScaledVector(F.v,dt);
   const r=Math.exp(-T/.45)*Math.cos(T*7);   // 장대 튕겨 올라옴
   th.x=F.th0.x*r; th.z=F.th0.z*r; bendPole(th.x,th.z); followCam(dt);
   if(T>FEND&&state==='fall') showResult();
