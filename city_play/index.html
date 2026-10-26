@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.37 · city_play</div>
+<div id="ver">v0.38 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -264,8 +264,8 @@ const obMat=new THREE.MeshStandardMaterial({color:0xf4f4f6,roughness:.4,emissive
 const bitGeo=new THREE.TetrahedronGeometry(.14,0);
 let obs=[], bits=[], popped=0, obNext=0;
 function spawnOb(){
-  // 화면 기준 각도 45°(오른쪽 위)~225°(왼쪽 아래): 오른쪽·아래쪽에서는 안 나옴
-  const a=(45+Math.random()*180)*Math.PI/180, R=cv.dist*1.6, ca=Math.cos(a), sa=Math.sin(a);
+  // 화면 기준 각도 90°(위)~180°(왼쪽): 위와 왼쪽에서만 나옴
+  const a=(90+Math.random()*90)*Math.PI/180, R=cv.dist*1.6, ca=Math.cos(a), sa=Math.sin(a);
   const m=new THREE.Mesh(obGeo,obMat);
   m.position.set(top.x+(ca*scrR.x-sa*scrD.x)*R, top.y+1+Math.random()*2.5, top.z+(ca*scrR.z-sa*scrD.z)*R);
   const sp=(2.6+Math.random()*1.8+Math.min(t,120)*.012)*R/16;
@@ -432,9 +432,9 @@ function physics(dt){
   const px=c*phi.x, pz=c*phi.z;
   const f={x:px*scrR.x+pz*scrD.x, z:px*scrR.z+pz*scrD.z};          // 내 조작
   const wf={x:wx*scrR.x+wz*scrD.x, z:wx*scrR.z+wz*scrD.z};          // 바람
-  // 7°부터 기울어지는 속도가 점점 느려져서 10°~13°에선 절반 속도 (위기에서 반응할 시간). 바깥으로 기울 때만, 되돌아올 땐 원래 속도
+  // 7°부터 기울어지는 속도가 점점 느려져서 10°에선 1.5배 느리게(속도 2/3) (위기에서 반응할 시간). 바깥으로 기울 때만, 되돌아올 땐 원래 속도
   const dg=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI, outward=th.x*om.x+th.z*om.z>0;
-  const slow=!outward||dg<=7?1:dg>=10?.5:1-.5*(dg-7)/3;
+  const SMIN=1/1.5, slow=!outward||dg<=7?1:dg>=10?SMIN:1-(1-SMIN)*(dg-7)/3;
   for(const a of ['x','z']){
     // 감속은 쓰러지려는 힘·바람·잔흔들림에만, 내 조작은 항상 원래 세기
     const acc=(k*fallF(th[a]) + wf[a] + (Math.random()-.5)*jit)*slow + f[a] - damp*om[a];
