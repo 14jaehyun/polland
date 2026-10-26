@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.50 · city_play</div>
+<div id="ver">v0.51 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -353,7 +353,7 @@ const keys={};
 addEventListener('deviceorientation',e=>{
   if(e.beta==null) return; ori={b:e.beta,g:e.gamma}; gotOri=true;
 });
-addEventListener('pointerdown',e=>{if(state!=='play')return;if(tapOb(e.clientX,e.clientY))return;touchStart={x:e.clientX,y:e.clientY};});
+addEventListener('pointerdown',e=>{if(state==='fall'){endFall();return;} if(state!=='play')return;if(tapOb(e.clientX,e.clientY))return;touchStart={x:e.clientX,y:e.clientY};});
 addEventListener('pointermove',e=>{if(!touchStart)return;touchVec={x:e.clientX-touchStart.x,y:e.clientY-touchStart.y};});
 addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('pointercancel',()=>{touchStart=null;touchVec={x:0,y:0};});
@@ -398,14 +398,22 @@ function reset(){
   clearObs(); popped=0; obNext=0; $('pop').textContent='';
   over=0; lphi={x:0,z:0}; prs={x:0,z:0}; flick={x:0,z:0}; t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
+  if(man.parent!==scene) scene.add(man);   // 떨어지며 도시 쪽에 붙였던 사람을 되돌림
+  body.quaternion.identity();
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
 }
 $('go').onclick=begin; $('again').onclick=begin;
 
+// ---------- 떨어지는 연출 (약 3초, 터치하면 건너뜀) ----------
+// 0~0.4초 슬로모션으로 휘청 → 0.4~0.7초 받침 가장자리를 축으로 넘어감 → 도시 쪽 중력대로 떨어지며 천천히 뒤집혀 작아짐
+// 무게가 빠진 장대는 반대로 한 번 '통' 튕겼다 잔잔해짐 → 2.5초부터 어두워지며 결과
+const FA=.4, FB=.3, FEND=3.0;
 function gameOver(){
   state='fall'; clearObs();
-  const d=Math.hypot(th.x,th.z)||1;
-  fall={vx:th.x/d*4+om.x*SWAY*.5,vz:th.z/d*4+om.z*SWAY*.5,vy:1,ry:0,time:0};
+  const d=Math.hypot(th.x,th.z)||1, lean=new THREE.Vector3(th.x/d,0,th.z/d);
+  const axis=new THREE.Vector3(0,1,0).cross(lean).normalize();          // 이 축으로 돌면 머리가 기운 쪽으로 넘어감
+  fall={time:0,lean,axis,th0:{x:th.x,z:th.z},P0:man.position.clone(),Q0:man.quaternion.clone(),edge:man.position.clone().addScaledVector(lean,.75),
+        released:false,v:null,spin:0,rt:0};
 }
 function showResult(){
   document.body.classList.remove('playing');
@@ -502,14 +510,35 @@ function pose(flail){
   // 흔들리면 몸을 반대로 살짝 기울여 버팀
   body.rotation.set(-om.z*.12,0,om.x*.12);
 }
+const fq=new THREE.Quaternion(), fv=new THREE.Vector3();
 function falling(dt){
-  fall.time+=dt; fall.vy-=20*dt;
-  man.position.x+=fall.vx*dt; man.position.z+=fall.vz*dt; man.position.y+=fall.vy*dt;
-  man.rotation.x+=Math.sign(th.z||.01)*dt*2.5; man.rotation.z-=Math.sign(th.x||.01)*dt*2.5;
-  // 장대는 천천히 제자리로
-  om.x*=.97; om.z*=.97; th.x*=.985; th.z*=.985; bendPole(th.x,th.z);
-  if(fall.time>2.4&&state==='fall') showResult();
+  const F=fall; F.time+=dt; const T=F.time;
+  if(T<FA){
+    // 슬로모션 휘청: 몸이 기운 쪽으로 서서히 기울며 허우적
+    const u=T/FA, ang=u*u*.45+Math.sin(T*38)*.06*(1-u);
+    body.quaternion.setFromAxisAngle(F.axis,ang);
+  } else if(T<FA+FB){
+    // 받침 가장자리를 축으로 넘어감 (옆으로 던지지 않음)
+    const u=(T-FA)/FB, ang=.45+u*u*1.3;
+    fq.setFromAxisAngle(F.axis,ang*.7);
+    man.position.copy(F.P0).sub(F.edge).applyQuaternion(fq).add(F.edge);
+    man.quaternion.copy(fq).multiply(F.Q0); body.quaternion.setFromAxisAngle(F.axis,ang*.3);
+  } else {
+    if(!F.released){
+      // 손을 놓는 순간: 사람을 도시 쪽 세상에 붙여서, 도시 기준 중력대로 떨어지게
+      PG.attach(man); F.released=true;
+      F.v=new THREE.Vector3().copy(F.lean).multiplyScalar(1.2).add(new THREE.Vector3(0,-1.5,0));
+      F.axisL=F.axis.clone();
+    }
+    F.v.y-=30*dt; man.position.addScaledVector(F.v,dt);
+    F.spin+=dt; fq.setFromAxisAngle(F.axisL,dt*(1.1+F.spin*.4)); man.quaternion.premultiply(fq);   // 천천히 뒤집힘
+    // 장대 반동: 무게가 빠지자 반대로 한 번 튕겼다가 잔잔해짐
+    F.rt+=dt; const r=Math.exp(-F.rt/.6)*Math.cos(F.rt*6);
+    th.x=F.th0.x*r; th.z=F.th0.z*r; bendPole(th.x,th.z); followCam(dt);
+  }
+  if(T>FEND&&state==='fall') showResult();
 }
+function endFall(){ if(state==='fall'&&fall&&fall.time>.3){ fall.time=FEND; showResult(); } }
 const AMP=[0,.5,1.1,1.9],AN=['멈춤','살살','보통','크게'];let ai=1;
 function idle(s){
   if(state!=='ready') return;
@@ -528,6 +557,8 @@ function draw(dt){
   }
   danger(dt);
   aim();
+  // 떨어지는 연출 끝 무렵 서서히 어두워짐
+  if(state==='fall'&&fall&&fall.time>2.5){ g2.fillStyle='rgba(5,5,7,'+Math.min(.85,(fall.time-2.5)/.5*.85)+')'; g2.fillRect(0,0,innerWidth,innerHeight); }
 }
 // ---------- 7°부터 원 하나(중심 구역)와 점(지금 기운 방향·정도)이 희미하게 나타나 10°로 갈수록 진해짐 ----------
 const RO=64, RI=RO/2, rv=new THREE.Vector3(); let az=0;
