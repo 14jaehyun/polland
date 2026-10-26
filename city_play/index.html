@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.56 · city_play</div>
+<div id="ver">v0.57 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -284,7 +284,11 @@ function spawnOb(){
   let lo=1,hi=200; for(let i=0;i<24;i++){const mid=(lo+hi)/2,v=at(mid).project(camera); if(Math.abs(v.x)>1.02||Math.abs(v.y)>1.02||v.z>1) hi=mid; else lo=mid;}
   const m=new THREE.Mesh(obGeo,obMat);
   m.position.copy(at(hi*1.06));
-  const VT=.4+Math.random()*.6;   // 화면에 보이는 시간 0.4~1초 랜덤
+  // 화면에서의 속도로 랜덤: 가장 느리면 위에서 1.6초, 가장 빠르면 옆에서 0.4초 걸리는 범위 (어느 방향이든 눈으로 따라갈 속도가 같게)
+  const cr=$('c').getBoundingClientRect(), mp=new THREE.Vector3(man.position.x,man.position.y+1.1,man.position.z).project(camera), ep=m.position.clone().project(camera);
+  const px=(v)=>({x:(v.x+1)/2*cr.width,y:(1-v.y)/2*cr.height}), M=px(mp), E=px(ep);
+  const dTop=M.y, dSide=M.x, vMin=dTop/1.6, vMax=Math.max(vMin*1.2,dSide/.4), v=vMin+Math.random()*(vMax-vMin);
+  const VT=Math.max(.35,Math.hypot(E.x-M.x,E.y-M.y)/v);
   // 곡선 경로: 출발점 → (옆으로 휘는 중간점) → 캐릭터. 좌우 어느 쪽으로 휠지는 랜덤
   const P0=m.position.clone(), P2=new THREE.Vector3(man.position.x,man.position.y+1.1,man.position.z);
   const dir=P2.clone().sub(P0), L=dir.length(), side=new THREE.Vector3(-dir.z,0,dir.x).normalize();
