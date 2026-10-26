@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.35 · city_play</div>
+<div id="ver">v0.36 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -337,7 +337,7 @@ addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('pointercancel',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('keydown',e=>keys[e.key]=true); addEventListener('keyup',e=>keys[e.key]=false);
 
-const SENS=2, MAXT=0.75; // 최대 기울기 입력(rad) — 작은 기울기 반응은 그대로, 끝까지 기울이면 더 세게 되돌림
+const SENS=2, MAXT=1.125; // 최대 기울기 입력(rad) — 폰을 약 32°까지 기울이는 만큼 힘이 계속 커짐 (최대 힘 예전의 1.5배)
 function readTilt(){
   // 반환: 쟁반 기울기 φ (x: 오른쪽 내려감 +, z: 화면 아래쪽 내려감 +)
   if(gotOri&&ori&&base){
@@ -412,7 +412,7 @@ function step(now){
 function physics(dt){
   t+=dt;
   const k=.45+Math.min(t,120)*.0013;           // 휘청이는 힘, 아주 천천히 강해짐 (최대 .6)
-  const c=3.2, damp=.55;                        // 되돌리는 힘 최대 3.2×.75=2.4 > 10°에서 쓰러지려는 힘 최대 2.1 → 어느 각도든 원복 가능, 떨어지는 건 반동 때문
+  const c=3.2, damp=.55;                        // 되돌리는 힘 최대 3.2×1.125=3.6 > 10°에서 쓰러지려는 힘 최대 2.1 + 바람 .45 → 끝까지 기울이면 어느 각도든 원복 가능
   const jit=.06+Math.min(t,120)*.0008;         // 대신 잔흔들림이 늘어남
   const phi=readTilt();
   // 바람: 10초 이후, 세기·길이 랜덤
@@ -430,14 +430,16 @@ function physics(dt){
     }
   }
   // 조작·바람은 화면 기준 → 땅 위 방향으로 바꿈 (시점이 바뀌어도 기울인 화면 쪽으로 휨)
-  const sx=c*phi.x+wx, sz=c*phi.z+wz;
-  const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
+  const px=c*phi.x, pz=c*phi.z;
+  const f={x:px*scrR.x+pz*scrD.x, z:px*scrR.z+pz*scrD.z};          // 내 조작
+  const wf={x:wx*scrR.x+wz*scrD.x, z:wx*scrR.z+wz*scrD.z};          // 바람
   // 7°부터 기울어지는 속도가 점점 느려져서 10°~13°에선 절반 속도 (위기에서 반응할 시간). 바깥으로 기울 때만, 되돌아올 땐 원래 속도
   const dg=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI, outward=th.x*om.x+th.z*om.z>0;
   const slow=!outward||dg<=7?1:dg>=10?.5:1-.5*(dg-7)/3;
   for(const a of ['x','z']){
-    const acc=k*fallF(th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
-    om[a]+=acc*dt*slow; th[a]+=om[a]*dt*slow;
+    // 감속은 쓰러지려는 힘·바람·잔흔들림에만, 내 조작은 항상 원래 세기
+    const acc=(k*fallF(th[a]) + wf[a] + (Math.random()-.5)*jit)*slow + f[a] - damp*om[a];
+    om[a]+=acc*dt; th[a]+=om[a]*dt*slow;
   }
   // 10°를 넘어도 바로 떨어지지 않고 0.6초 버틸 시간을 줌 (그 안에 돌아오면 생존, 13°를 넘으면 즉시 떨어짐)
   const thm=Math.hypot(th.x,th.z);
