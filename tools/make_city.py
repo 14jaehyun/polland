@@ -60,9 +60,26 @@ print('up', up.round(4))
 
 os.makedirs(a.out, exist_ok=True)
 im.save(os.path.join(a.out, a.id + '.jpg'), 'JPEG', quality=90)
+extra = {}
+if a.tear:   # 뒷판용 그림: 둘레보다 확 가까운 것(탑·앞 빌딩)을 지우고 주변으로 메워서, 틈으로 탑이 두 번 보이지 않게
+    import cv2
+    from scipy.ndimage import maximum_filter
+    from scipy.ndimage import gaussian_filter
+    # 같은 줄(비슷한 거리)의 주변 땅보다 확 가까운 것 = 솟은 탑·빌딩. 줄 방향으로 넓게 보고 가장 먼 깊이를 땅으로 봄
+    far = gaussian_filter(maximum_filter(vd, size=(5, int(a.nx * .3) | 1)), 2)
+    near = (vd * a.tear < far).astype(np.uint8) * 255
+    extra['vdb'] = base64.b64encode(np.minimum(far, vd.max()).astype('<f4').tobytes()).decode()   # 뒷판 깊이
+    m = cv2.resize(near, (W, H), interpolation=cv2.INTER_LINEAR)
+    m = cv2.dilate((m > 60).astype(np.uint8) * 255, np.ones((9, 9), np.uint8))
+    small = 2; bgr = cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR)
+    fill = cv2.inpaint(cv2.resize(bgr, (W // small, H // small)), cv2.resize(m, (W // small, H // small)), 12, cv2.INPAINT_TELEA)
+    fill = cv2.resize(fill, (W, H), interpolation=cv2.INTER_CUBIC)
+    out = np.where(m[..., None] > 0, fill, bgr)
+    cv2.imwrite(os.path.join(a.out, a.id + '_bg.jpg'), out, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    extra['bg'] = 1
 import hashlib; ver = hashlib.md5(open(os.path.join(a.out, a.id + '.jpg'), 'rb').read()).hexdigest()[:8]   # 그림이 바뀌면 브라우저가 새로 받게
 json.dump({'id': a.id, 'name': a.name, 'sub': a.sub, 'nx': NX, 'ny': NY, 'vd': base64.b64encode(vd.tobytes()).decode(),
-           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'ver': ver, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH], **({'tear': a.tear, 'tearR': a.tearR} if a.tear else {})},
+           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'ver': ver, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH], **({'tear': a.tear, 'tearR': a.tearR} if a.tear else {}), **extra},
           open(os.path.join(a.out, a.id + '.json'), 'w'))
 lp = os.path.join(a.out, 'cities.json')
 L = json.load(open(lp)) if os.path.exists(lp) else []

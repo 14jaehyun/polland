@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.42 · city_play</div>
+<div id="ver">v0.43 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -150,13 +150,13 @@ function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15
   const geo=relief(VD,CD.tear||0);
   // 뒷판: 끊긴 칸 뒤로 보이는 배경. 주변에서 가장 먼 깊이로 펴서 땅 높이에 깔아둠 (가만히 있을 땐 앞판과 똑같이 보임)
   let geoB=null;
-  if(CD.tear){const R=CD.tearR||5,B=new Float32Array(VD.length);
-    for(let j=0;j<G.ny;j++)for(let i=0;i<G.nx;i++){let m=0;for(let y=Math.max(0,j-R);y<=Math.min(G.ny-1,j+R);y++)for(let x=Math.max(0,i-R);x<=Math.min(G.nx-1,i+R);x++){const v=VD[y*G.nx+x];if(v>m)m=v;}B[j*G.nx+i]=m;}
-    geoB=relief(B,0);}
+  if(CD.tear&&CD.vdb){ geoB=relief(new Float32Array(Uint8Array.from(atob(CD.vdb),c=>c.charCodeAt(0)).buffer),0); }   // 뒷판 깊이·그림(탑을 지운 것)은 도시 데이터에서
   // 그림 속 세상은 위 방향이 살짝 기울어 있어서, 장대 꼭대기를 축으로 돌려 우리 장면의 위와 맞춤
   const paintG=new THREE.Group(); paintG.quaternion.copy(qP); paintG.position.copy(T0).sub(T0.clone().applyQuaternion(qP)); PGi.add(paintG);
   const rmat=new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,fog:false});
-  if(geoB){backMesh=new THREE.Mesh(geoB,rmat); paintG.add(backMesh);}
+  if(geoB){ let bm=rmat;
+    if(CD.bg){const bi=new Image(),bt=new THREE.Texture(bi);bi.onload=()=>{bt.needsUpdate=true;};bi.src=CD.img.replace(/\.jpg/,'_bg.jpg');bt.anisotropy=tex.anisotropy;bm=new THREE.MeshBasicMaterial({map:bt,side:THREE.DoubleSide,fog:false});}
+    backMesh=new THREE.Mesh(geoB,bm); paintG.add(backMesh);}
   reliefMesh=new THREE.Mesh(geo,rmat); paintG.add(reliefMesh);
 }
 
