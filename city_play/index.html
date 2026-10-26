@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.48 · city_play</div>
+<div id="ver">v0.49 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -275,14 +275,18 @@ computePivot(); addEventListener('resize',computePivot);
 const obGeo=new THREE.OctahedronGeometry(.45,0);
 const obMat=new THREE.MeshStandardMaterial({color:0xf4f4f6,roughness:.4,emissive:0x555560});
 const bitGeo=new THREE.TetrahedronGeometry(.14,0);
-let obs=[], bits=[], popped=0, obNext=0;
+let obs=[], bits=[], popped=0, obNext=0; const HIT=2.1;
 function spawnOb(){
   // 화면 기준 각도 90°(위)~180°(왼쪽): 위와 왼쪽에서만 나옴
   const a=(90+Math.random()*90)*Math.PI/180, R=cv.dist*1.6, ca=Math.cos(a), sa=Math.sin(a);
   const m=new THREE.Mesh(obGeo,obMat);
   m.position.set(top.x+(ca*scrR.x-sa*scrD.x)*R, top.y+1+Math.random()*2.5, top.z+(ca*scrR.z-sa*scrD.z)*R);
-  const sp=(2.6+Math.random()*1.8+Math.min(t,120)*.012)*R/16;
-  obs.push({m,sp,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
+  const sp=(2.6+Math.random()*1.8+Math.min(t,120)*.012)*R/16*1.5;   // 속도 1.5배
+  // 곡선 경로: 출발점 → (옆으로 휘는 중간점) → 캐릭터. 좌우 어느 쪽으로 휠지는 랜덤
+  const P0=m.position.clone(), P2=new THREE.Vector3(man.position.x,man.position.y+1.1,man.position.z);
+  const dir=P2.clone().sub(P0), L=dir.length(), side=new THREE.Vector3(-dir.z,0,dir.x).normalize();
+  const P1=P0.clone().lerp(P2,.5).addScaledVector(side,(Math.random()<.5?-1:1)*L*(.28+Math.random()*.2)).add(new THREE.Vector3(0,L*.08,0));
+  obs.push({m,sp,P0,P1,P2,s:0,len:L*1.15,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
   scene.add(m);
 }
 function burst(p,n,col){
@@ -297,18 +301,18 @@ function clearObs(){ for(const o of obs) scene.remove(o.m); obs=[]; }
 function updateObs(dt){
   if(state==='play'&&t>15){
     obNext-=dt;
-    if(obNext<=0){ spawnOb(); obNext=Math.max(1.4,4.5-t*.012)+Math.random()*2.5; }
+    if(obNext<=0){ spawnOb(); obNext=(Math.max(1.4,4.5-t*.012)+Math.random()*2.5)*1.5; }   // 빈도 1.5배 낮춤
   }
-  const aim=new THREE.Vector3();
+  const tan=new THREE.Vector3();
   for(let k=obs.length-1;k>=0;k--){
     const o=obs[k];
-    aim.set(man.position.x,man.position.y+1.1,man.position.z).sub(o.m.position);
-    const d=aim.length();
-    o.m.position.addScaledVector(aim.normalize(),o.sp*dt);
+    o.s=Math.min(1,o.s+o.sp*dt/o.len); const u=o.s, iu=1-u;
+    o.m.position.set(0,0,0).addScaledVector(o.P0,iu*iu).addScaledVector(o.P1,2*iu*u).addScaledVector(o.P2,u*u);
+    tan.copy(o.P1).sub(o.P0).multiplyScalar(2*iu).addScaledVector(o.P2.clone().sub(o.P1),2*u);   // 지금 날아가는 방향
     o.m.rotation.x+=o.spin.x*dt*3; o.m.rotation.y+=o.spin.y*dt*3;
-    if(d<1.3&&state==='play'){
-      // 맞으면 날아온 방향으로 크게 밀림
-      om.x+=aim.x*.55; om.z+=aim.z*.55;
+    if(o.s>.97&&state==='play'){
+      // 맞으면 날아오던 방향으로 휘청일 만큼 밀림 (흔들림 속도 2.1 → 중심에서 맞아도 5°쯤까지)
+      tan.y=0; tan.normalize(); om.x+=tan.x*HIT; om.z+=tan.z*HIT;
       burst(o.m.position,10,0xd8181f); scene.remove(o.m); obs.splice(k,1);
     }
   }
