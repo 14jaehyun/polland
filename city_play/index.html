@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.31 · city_play</div>
+<div id="ver">v0.32 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -337,11 +337,11 @@ addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('pointercancel',()=>{touchStart=null;touchVec={x:0,y:0};});
 addEventListener('keydown',e=>keys[e.key]=true); addEventListener('keyup',e=>keys[e.key]=false);
 
-const MAXT=0.75; // 최대 기울기 입력(rad) — 작은 기울기 반응은 그대로, 끝까지 기울이면 더 세게 되돌림
+const SENS=2, MAXT=0.75; // 최대 기울기 입력(rad) — 작은 기울기 반응은 그대로, 끝까지 기울이면 더 세게 되돌림
 function readTilt(){
   // 반환: 쟁반 기울기 φ (x: 오른쪽 내려감 +, z: 화면 아래쪽 내려감 +)
   if(gotOri&&ori&&base){
-    let gx=(ori.g-base.g), bz=(ori.b-base.b);
+    let gx=(ori.g-base.g)*SENS, bz=(ori.b-base.b)*SENS;   // 민감도 2배 (최대 힘은 그대로, 절반만 기울여도 도달)
     const d=Math.PI/180;
     return {x:clamp(gx*d,-MAXT,MAXT), z:clamp(bz*d,-MAXT,MAXT)};
   }
@@ -354,6 +354,7 @@ function readTilt(){
 function clamp(v,a,b){return v<a?a:v>b?b:v}
 
 // ---------- 게임 상태 ----------
+const GRACE=.6, LIMIT_HARD=Math.tan((LIMIT_DEG+3)*Math.PI/180)*320/25.6; let over=0;
 let state='ready', t=0, th={x:0,z:0}, om={x:0,z:0};
 let wind={x:0,z:0,left:0,next:3}, fall=null, wake=null;
 let best=0; try{best=+localStorage.getItem('pole-best-'+CD.id)||0}catch(e){}
@@ -372,7 +373,7 @@ async function begin(){
 }
 function reset(){
   clearObs(); popped=0; obNext=0; $('pop').textContent='';
-  t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
+  over=0; t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
 }
@@ -435,7 +436,9 @@ function physics(dt){
     const acc=k*fallF(th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
   }
-  if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
+  // 10°를 넘어도 바로 떨어지지 않고 0.6초 버틸 시간을 줌 (그 안에 돌아오면 생존, 13°를 넘으면 즉시 떨어짐)
+  const thm=Math.hypot(th.x,th.z);
+  if(thm>LIMIT){ over+=dt; if(over>GRACE||thm>LIMIT_HARD) gameOver(); } else over=Math.max(0,over-dt*2);
   $('time').textContent=t.toFixed(1);
   bendPole(th.x,th.z); placeMan(); pose(1);
   followCam(dt);
@@ -491,9 +494,11 @@ function danger(dt){
   gz+=(gw-gz)*Math.min(1,dt*(gw>gz?10:6));
   if(gz>.005){
     const cr=$('c').getBoundingClientRect(), W=cr.width, H=cr.height, cx=cr.left+W/2, cy=cr.top+H/2;
-    const gg=g2.createRadialGradient(cx,cy,Math.max(W,H)*.34,cx,cy,Math.max(W,H)*.7);
-    gg.addColorStop(0,'rgba(20,200,90,0)'); gg.addColorStop(.6,'rgba(30,210,100,'+(gz*.22)+')'); gg.addColorStop(1,'rgba(10,170,70,'+(gz*.45)+')');
+    const gg=g2.createRadialGradient(cx,cy,Math.max(W,H)*.24,cx,cy,Math.max(W,H)*.62);
+    gg.addColorStop(0,'rgba(30,230,110,0)'); gg.addColorStop(.5,'rgba(40,235,120,'+(gz*.4)+')'); gg.addColorStop(1,'rgba(20,210,95,'+(gz*.8)+')');
     g2.fillStyle=gg; g2.fillRect(cr.left,cr.top,W,H);
+    g2.fillStyle='rgba(40,220,110,'+(gz*.12)+')'; g2.fillRect(cr.left,cr.top,W,H);   // 화면 전체 초록 기
+    g2.strokeStyle='rgba(90,255,150,'+(gz*.9)+')'; g2.lineWidth=8; g2.strokeRect(cr.left+4,cr.top+4,W-8,H-8);   // 또렷한 초록 테두리
   }
   let w=0; if(state==='play'&&deg>5){ const u=Math.min(1,(deg-5)/(LIMIT_DEG-5)); w=.45+.55*u*u*(3-2*u); }   // 5°에서 바로 45%로 켜짐
   dz+=(w-dz)*Math.min(1,dt*(w>dz?14:4));               // 켜질 땐 즉시, 꺼질 땐 조금 천천히
