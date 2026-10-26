@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.36 · city_play</div>
+<div id="ver">v0.37 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -354,7 +354,6 @@ function readTilt(){
 function clamp(v,a,b){return v<a?a:v>b?b:v}
 
 // ---------- 게임 상태 ----------
-const GRACE=.6, LIMIT_HARD=Math.tan((LIMIT_DEG+3)*Math.PI/180)*320/25.6; let over=0;
 let state='ready', t=0, th={x:0,z:0}, om={x:0,z:0};
 let wind={x:0,z:0,left:0,next:3}, fall=null, wake=null;
 let best=0; try{best=+localStorage.getItem('pole-best-'+CD.id)||0}catch(e){}
@@ -373,7 +372,7 @@ async function begin(){
 }
 function reset(){
   clearObs(); popped=0; obNext=0; $('pop').textContent='';
-  over=0; t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
+  t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
 }
@@ -441,9 +440,7 @@ function physics(dt){
     const acc=(k*fallF(th[a]) + wf[a] + (Math.random()-.5)*jit)*slow + f[a] - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt*slow;
   }
-  // 10°를 넘어도 바로 떨어지지 않고 0.6초 버틸 시간을 줌 (그 안에 돌아오면 생존, 13°를 넘으면 즉시 떨어짐)
-  const thm=Math.hypot(th.x,th.z);
-  if(thm>LIMIT){ over+=dt; if(over>GRACE||thm>LIMIT_HARD) gameOver(); } else over=Math.max(0,over-dt*2);
+  if(Math.hypot(th.x,th.z)>LIMIT) gameOver();   // 10° 넘으면 바로 떨어짐 (유예 없음)
   $('time').textContent=t.toFixed(1);
   bendPole(th.x,th.z); placeMan(); pose(1);
   followCam(dt);
