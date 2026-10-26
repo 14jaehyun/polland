@@ -2,6 +2,7 @@
 
 사용: python3 tools/make_city.py 그림.png shinjuku "Shinjuku" "新宿 · 도쿄" [--adj 1] [--model vits.onnx]
      [--nx 241 --sharp 9 --tear 1.06]  높은 탑이 뭉개질 때: 격자 촘촘히, 깊이 경계 또렷하게, 끊긴 곳은 찢고 뒷판으로
+     [--bgimg 탑없는그림.jpg]  뒷판에 쓸 탑 없는 그림 (없으면 주변 색으로 메움)
 깊이 모델: Depth Anything V2 small ONNX (github fabio-sim/Depth-Anything-ONNX v2.0.0, depth_anything_v2_vits.onnx)
 틀은 그림 비율로 자동 판별:
   2:3      → 기준 틀 전체 (예전 그림)
@@ -14,7 +15,7 @@ from PIL import Image
 
 ap = argparse.ArgumentParser()
 ap.add_argument('img'); ap.add_argument('id'); ap.add_argument('name'); ap.add_argument('sub')
-ap.add_argument('--adj', type=float, default=0); ap.add_argument('--nx', type=int, default=145); ap.add_argument('--sharp', type=int, default=0); ap.add_argument('--tear', type=float, default=0); ap.add_argument('--tearR', type=int, default=5); ap.add_argument('--limit', type=float, default=10); ap.add_argument('--model', default='/tmp/claude-0/da/vits.onnx')
+ap.add_argument('--adj', type=float, default=0); ap.add_argument('--nx', type=int, default=145); ap.add_argument('--sharp', type=int, default=0); ap.add_argument('--tear', type=float, default=0); ap.add_argument('--tearR', type=int, default=5); ap.add_argument('--bgimg', default=''); ap.add_argument('--limit', type=float, default=10); ap.add_argument('--model', default='/tmp/claude-0/da/vits.onnx')
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'city'))
 a = ap.parse_args()
 
@@ -72,8 +73,11 @@ if a.tear:   # 뒷판용 그림: 둘레보다 확 가까운 것(탑·앞 빌딩)
     m = cv2.resize(near, (W, H), interpolation=cv2.INTER_LINEAR)
     m = cv2.dilate((m > 60).astype(np.uint8) * 255, np.ones((9, 9), np.uint8))
     small = 2; bgr = cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR)
-    fill = cv2.inpaint(cv2.resize(bgr, (W // small, H // small)), cv2.resize(m, (W // small, H // small)), 12, cv2.INPAINT_TELEA)
-    fill = cv2.resize(fill, (W, H), interpolation=cv2.INTER_CUBIC)
+    if a.bgimg:   # 탑 없이 따로 생성한 배경 그림이 있으면 그걸 씀 (지운 자리만 갈아끼움)
+        fill = cv2.cvtColor(np.asarray(Image.open(a.bgimg).convert('RGB').resize((W, H), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
+    else:
+        fill = cv2.inpaint(cv2.resize(bgr, (W // small, H // small)), cv2.resize(m, (W // small, H // small)), 12, cv2.INPAINT_TELEA)
+        fill = cv2.resize(fill, (W, H), interpolation=cv2.INTER_CUBIC)
     out = np.where(m[..., None] > 0, fill, bgr)
     cv2.imwrite(os.path.join(a.out, a.id + '_bg.jpg'), out, [cv2.IMWRITE_JPEG_QUALITY, 85])
     extra['bg'] = 1
