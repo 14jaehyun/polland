@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.41 · city_play</div>
+<div id="ver">v0.42 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -127,7 +127,7 @@ applyView();
 
 // ---------- 도시: 생성 그림을 깊이대로 띄운 판 ----------
 // 판은 제자리에서 화면 안의 한 점(장대가 땅에 닿아 보이는 곳 PV)을 축으로 회전만 함
-const PG=new THREE.Group(), PGi=new THREE.Group(); PG.add(PGi); scene.add(PG); let reliefMesh=null, poleM=null; const PV=new THREE.Vector3();
+const PG=new THREE.Group(), PGi=new THREE.Group(); PG.add(PGi); scene.add(PG); let reliefMesh=null, backMesh=null, poleM=null; const PV=new THREE.Vector3();
 function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 {
   const [CU0,CUW,CV0,CVH]=CD.frame;   // 이 그림이 기준 틀에서 차지하는 부분
@@ -135,16 +135,29 @@ function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15
   const img=new Image(); const tex=new THREE.Texture(img); img.onload=()=>{tex.needsUpdate=true;}; img.src=CD.img;
   tex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
   // 그림 가장자리 바깥으로 15%씩 더 늘려서(끝 픽셀을 그대로 늘림) 흔들려도 빈 곳이 안 보이게
-  const ex=Math.round((G.nx-1)*.3),ey=Math.round((G.ny-1)*.3),nx=G.nx+2*ex,ny=G.ny+2*ey,pos=new Float32Array(nx*ny*3),uv=new Float32Array(nx*ny*2),tv=Math.tan(74*Math.PI/360),asp=RW/RH,v3=new THREE.Vector3();
-  const cl=(a,lo,hi)=>a<lo?lo:a>hi?hi:a;
+  const ex=Math.round((G.nx-1)*.3),ey=Math.round((G.ny-1)*.3),nx=G.nx+2*ex,ny=G.ny+2*ey,tv=Math.tan(74*Math.PI/360),asp=RW/RH,v3=new THREE.Vector3();
   const mr=(k,n)=>{k=k<0?-k:k;return k>n-1?Math.max(0,2*(n-1)-k):k;};   // 그림 밖은 거울처럼 접어서 이어 붙임
-  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const k=j*nx+i,u=(i-ex)/(G.nx-1),v=(j-ey)/(G.ny-1),mi=mr(i-ex,G.nx),mj=mr(j-ey,G.ny),d=VD[mj*G.nx+mi];
-    const bu=CU0+u*CUW,bv=CV0+v*CVH;v3.set((bu*2-1)*asp*tv*d,(1-bv*2)*tv*d,-d).applyMatrix4(pc.matrixWorld);pos[k*3]=v3.x;pos[k*3+1]=v3.y;pos[k*3+2]=v3.z;uv[k*2]=mi/(G.nx-1);uv[k*2+1]=1-mj/(G.ny-1);}
-  const idx=[];for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i,b=a+1,c=a+nx,d=c+1;idx.push(a,c,b,b,c,d);}
-  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));geo.setIndex(idx);
+  // 깊이 격자 하나로 면 만들기. tear>0이면 깊이가 확 끊기는 칸(높은 탑 가장자리)은 비워서 고무처럼 늘어나지 않게
+  function relief(D,tear){
+    const pos=new Float32Array(nx*ny*3),uv=new Float32Array(nx*ny*2),dd=new Float32Array(nx*ny);
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const k=j*nx+i,u=(i-ex)/(G.nx-1),v=(j-ey)/(G.ny-1),mi=mr(i-ex,G.nx),mj=mr(j-ey,G.ny),d=D[mj*G.nx+mi];dd[k]=d;
+      const bu=CU0+u*CUW,bv=CV0+v*CVH;v3.set((bu*2-1)*asp*tv*d,(1-bv*2)*tv*d,-d).applyMatrix4(pc.matrixWorld);pos[k*3]=v3.x;pos[k*3+1]=v3.y;pos[k*3+2]=v3.z;uv[k*2]=mi/(G.nx-1);uv[k*2+1]=1-mj/(G.ny-1);}
+    const idx=[];for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){const a=j*nx+i,b=a+1,c=a+nx,d=c+1;
+      if(tear>0){const lo=Math.min(dd[a],dd[b],dd[c],dd[d]),hi=Math.max(dd[a],dd[b],dd[c],dd[d]); if(hi>lo*tear) continue;}
+      idx.push(a,c,b,b,c,d);}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));geo.setIndex(idx);return geo;
+  }
+  const geo=relief(VD,CD.tear||0);
+  // 뒷판: 끊긴 칸 뒤로 보이는 배경. 주변에서 가장 먼 깊이로 펴서 땅 높이에 깔아둠 (가만히 있을 땐 앞판과 똑같이 보임)
+  let geoB=null;
+  if(CD.tear){const R=CD.tearR||5,B=new Float32Array(VD.length);
+    for(let j=0;j<G.ny;j++)for(let i=0;i<G.nx;i++){let m=0;for(let y=Math.max(0,j-R);y<=Math.min(G.ny-1,j+R);y++)for(let x=Math.max(0,i-R);x<=Math.min(G.nx-1,i+R);x++){const v=VD[y*G.nx+x];if(v>m)m=v;}B[j*G.nx+i]=m;}
+    geoB=relief(B,0);}
   // 그림 속 세상은 위 방향이 살짝 기울어 있어서, 장대 꼭대기를 축으로 돌려 우리 장면의 위와 맞춤
   const paintG=new THREE.Group(); paintG.quaternion.copy(qP); paintG.position.copy(T0).sub(T0.clone().applyQuaternion(qP)); PGi.add(paintG);
-  reliefMesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,fog:false})); paintG.add(reliefMesh);
+  const rmat=new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide,fog:false});
+  if(geoB){backMesh=new THREE.Mesh(geoB,rmat); paintG.add(backMesh);}
+  reliefMesh=new THREE.Mesh(geo,rmat); paintG.add(reliefMesh);
 }
 
 
@@ -244,7 +257,7 @@ function computePivot(){
   const ty=1-2*PIVY, v=new THREE.Vector3(); let s=1;
   for(;s<TOP;s+=.25){ v.copy(T0).addScaledVector(dv,s).project(camera); if(v.y<=ty) break; }
   const ray=new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(v.x,ty),camera);
-  const hit=ray.intersectObject(reliefMesh,false)[0]; if(!hit) return;
+  const hit=ray.intersectObjects(backMesh?[reliefMesh,backMesh]:[reliefMesh],false)[0]; if(!hit) return;
   PV.copy(hit.point); PG.position.copy(PV); PGi.position.copy(PV).multiplyScalar(-1);
   // 아래로 갈수록 확 가늘어지고(위 0.6 → 아래 0.18), 도시 빛에 묻히듯 어두운 푸른색으로 바램 → 높이감
   const g=new THREE.CylinderGeometry(.6,.18,s,28,24); g.translate(0,-s/2,0);
@@ -441,9 +454,9 @@ function physics(dt){
     const acc=(k*fallF(th[a]) + wf[a] + (Math.random()-.5)*jit)*slow + f[a] - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt*slow;
   }
-  // 9.5°를 넘으면 0.5초 유예: 그 안에 9.5° 안으로 돌아오면 생존, 12°를 넘으면 즉시 떨어짐
+  // 9°를 넘으면 0.6초 유예: 그 안에 9° 안으로 돌아오면 생존, 13°를 넘으면 즉시 떨어짐
   const dgn=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI;
-  if(dgn>12) gameOver(); else if(dgn>9.5){ over+=dt; if(over>.5) gameOver(); } else over=0;
+  if(dgn>13) gameOver(); else if(dgn>9){ over+=dt; if(over>.6) gameOver(); } else over=0;
   $('time').textContent=t.toFixed(1);
   bendPole(th.x,th.z); placeMan(); pose(1);
   followCam(dt);

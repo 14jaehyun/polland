@@ -1,6 +1,7 @@
 """도시 그림 한 장 → city/<id>.jpg + city/<id>.json (깊이 격자, 그림 속 위 방향, 틀) + cities.json 목록 갱신
 
 사용: python3 tools/make_city.py 그림.png shinjuku "Shinjuku" "新宿 · 도쿄" [--adj 1] [--model vits.onnx]
+     [--nx 241 --sharp 9 --tear 1.06]  높은 탑이 뭉개질 때: 격자 촘촘히, 깊이 경계 또렷하게, 끊긴 곳은 찢고 뒷판으로
 깊이 모델: Depth Anything V2 small ONNX (github fabio-sim/Depth-Anything-ONNX v2.0.0, depth_anything_v2_vits.onnx)
 틀은 그림 비율로 자동 판별:
   2:3      → 기준 틀 전체 (예전 그림)
@@ -13,7 +14,7 @@ from PIL import Image
 
 ap = argparse.ArgumentParser()
 ap.add_argument('img'); ap.add_argument('id'); ap.add_argument('name'); ap.add_argument('sub')
-ap.add_argument('--adj', type=float, default=0); ap.add_argument('--limit', type=float, default=10); ap.add_argument('--model', default='/tmp/claude-0/da/vits.onnx')
+ap.add_argument('--adj', type=float, default=0); ap.add_argument('--nx', type=int, default=145); ap.add_argument('--sharp', type=int, default=0); ap.add_argument('--tear', type=float, default=0); ap.add_argument('--tearR', type=int, default=5); ap.add_argument('--limit', type=float, default=10); ap.add_argument('--model', default='/tmp/claude-0/da/vits.onnx')
 ap.add_argument('--out', default=os.path.join(os.path.dirname(__file__), '..', 'city'))
 a = ap.parse_args()
 
@@ -28,10 +29,15 @@ x = ((x - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]).transpose(2, 0, 1)[Non
 s = ort.InferenceSession(a.model)
 o = np.squeeze(s.run(None, {s.get_inputs()[0].name: x})[0])
 d = np.asarray(Image.fromarray(o.astype(np.float32)).resize((W, H), Image.BICUBIC)); d = (d - d.min()) / (d.max() - d.min())
+if a.sharp:   # 깊이 경계(탑 가장자리)를 계단처럼 또렷하게: 경계 근처만 주변 최소/최대 중 가까운 쪽으로
+    from scipy.ndimage import minimum_filter, maximum_filter
+    lo, hi = minimum_filter(d, a.sharp), maximum_filter(d, a.sharp)
+    edge = (hi - lo) > .04
+    d = np.where(edge, np.where(d - lo < hi - d, lo, hi), d)
 
 # 시차 → 시야 깊이 (몽콕 그림에서 맞춘 값)
 A, B = 0.009259666907146335, 0.002334771897011315
-NX = 145
+NX = a.nx
 NY = int(round((NX - 1) * H / W)) + 1
 ys = np.linspace(0, H - 1, NY).round().astype(int); xs = np.linspace(0, W - 1, NX).round().astype(int)
 vd = (1 / (A * d[np.ix_(ys, xs)] + B)).astype('<f4')
@@ -56,7 +62,7 @@ os.makedirs(a.out, exist_ok=True)
 im.save(os.path.join(a.out, a.id + '.jpg'), 'JPEG', quality=90)
 import hashlib; ver = hashlib.md5(open(os.path.join(a.out, a.id + '.jpg'), 'rb').read()).hexdigest()[:8]   # 그림이 바뀌면 브라우저가 새로 받게
 json.dump({'id': a.id, 'name': a.name, 'sub': a.sub, 'nx': NX, 'ny': NY, 'vd': base64.b64encode(vd.tobytes()).decode(),
-           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'ver': ver, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH]},
+           'up': [round(float(t), 5) for t in up], 'adj': a.adj, 'ver': ver, 'limitDeg': a.limit, 'frame': [U0, UW, V0, VH], **({'tear': a.tear, 'tearR': a.tearR} if a.tear else {})},
           open(os.path.join(a.out, a.id + '.json'), 'w'))
 lp = os.path.join(a.out, 'cities.json')
 L = json.load(open(lp)) if os.path.exists(lp) else []
