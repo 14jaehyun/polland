@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.39 · city_play</div>
+<div id="ver">v0.40 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -354,6 +354,7 @@ function readTilt(){
 function clamp(v,a,b){return v<a?a:v>b?b:v}
 
 // ---------- 게임 상태 ----------
+let over=0;
 let state='ready', t=0, th={x:0,z:0}, om={x:0,z:0};
 let wind={x:0,z:0,left:0,next:3}, fall=null, wake=null;
 let best=0; try{best=+localStorage.getItem('pole-best-'+CD.id)||0}catch(e){}
@@ -372,7 +373,7 @@ async function begin(){
 }
 function reset(){
   clearObs(); popped=0; obNext=0; $('pop').textContent='';
-  t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
+  over=0; t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
 }
@@ -440,7 +441,9 @@ function physics(dt){
     const acc=(k*fallF(th[a]) + wf[a] + (Math.random()-.5)*jit)*slow + f[a] - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt*slow;
   }
-  if(Math.hypot(th.x,th.z)>LIMIT) gameOver();   // 10° 넘으면 바로 떨어짐 (유예 없음)
+  // 9.5°를 넘으면 0.5초 유예: 그 안에 9.5° 안으로 돌아오면 생존, 12°를 넘으면 즉시 떨어짐
+  const dgn=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI;
+  if(dgn>12) gameOver(); else if(dgn>9.5){ over+=dt; if(over>.5) gameOver(); } else over=0;
   $('time').textContent=t.toFixed(1);
   bendPole(th.x,th.z); placeMan(); pose(1);
   followCam(dt);
@@ -487,11 +490,11 @@ function draw(dt){
   danger(dt);
   aim();
 }
-// ---------- 6°부터 원 하나(중심 구역)와 점(지금 기운 방향·정도)이 희미하게 나타나 10°로 갈수록 진해짐 ----------
+// ---------- 7°부터 원 하나(중심 구역)와 점(지금 기운 방향·정도)이 희미하게 나타나 10°로 갈수록 진해짐 ----------
 const RO=64, RI=RO/2, rv=new THREE.Vector3(); let az=0;
 function aim(){
   const deg=Math.hypot(tilt.x,tilt.z)*180/Math.PI;
-  let w=state==='play'?Math.min(1,Math.max(0,(deg-6)/(LIMIT_DEG-6))):0;
+  let w=state==='play'?Math.min(1,Math.max(0,(deg-7)/(LIMIT_DEG-7))):0;
   az+=(w-az)*.25; if(az<.01) return;
   rv.copy(man.position); rv.y+=.6; rv.project(camera);
   const cr=$('c').getBoundingClientRect(), cx=cr.left+(rv.x+1)/2*cr.width, cy=cr.top+(1-rv.y)/2*cr.height;
