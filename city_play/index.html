@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.34 · city_play</div>
+<div id="ver">v0.35 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -432,8 +432,9 @@ function physics(dt){
   // 조작·바람은 화면 기준 → 땅 위 방향으로 바꿈 (시점이 바뀌어도 기울인 화면 쪽으로 휨)
   const sx=c*phi.x+wx, sz=c*phi.z+wz;
   const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
-  // 7°부터 기울어지는 속도가 점점 느려져서 10°~13°에선 절반 속도 (위기에서 반응할 시간)
-  const dg=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI, slow=dg<=7?1:dg>=10?.5:1-.5*(dg-7)/3;
+  // 7°부터 기울어지는 속도가 점점 느려져서 10°~13°에선 절반 속도 (위기에서 반응할 시간). 바깥으로 기울 때만, 되돌아올 땐 원래 속도
+  const dg=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI, outward=th.x*om.x+th.z*om.z>0;
+  const slow=!outward||dg<=7?1:dg>=10?.5:1-.5*(dg-7)/3;
   for(const a of ['x','z']){
     const acc=k*fallF(th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt*slow; th[a]+=om[a]*dt*slow;
