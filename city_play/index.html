@@ -65,12 +65,12 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.26 · city_play</div>
+<div id="ver">v0.27 · city_play</div>
 
-<div class="tog"><select id="city" aria-label="도시"></select><select id="ctrl" aria-label="조작"><option value="mix">혼합</option><option value="tilt">기울기만</option><option value="move">움직임만</option></select></div>
+<div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
   <h1>장대 위에서<br><b>버티기</b></h1>
-  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡고, 날아오는 방해물은 눌러서 터뜨리세요. 기울인 쪽(화면 기준)으로 장대가 휘어요. 위급할 땐 손바닥 위 막대처럼 쓰러지는 쪽으로 폰을 10cm쯤 쓱 밀어 받치세요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
+  <p>폰을 쟁반처럼 들고, 천천히 기울여 휘청이는 장대의 균형을 잡고, 날아오는 방해물은 눌러서 터뜨리세요. 기울인 쪽(화면 기준)으로 장대가 휘어요. 시작할 때 폰 각도가 수평 기준이 됩니다.</p>
   <button id="go" type="button">시작</button>
   <p style="font-size:12px">화면 회전 잠금을 켜두면 좋아요</p>
 </div>
@@ -331,21 +331,6 @@ const keys={};
 addEventListener('deviceorientation',e=>{
   if(e.beta==null) return; ori={b:e.beta,g:e.gamma}; gotOri=true;
 });
-// 폰 움직임(손바닥 위 막대처럼 밑동을 옮김): 화면 기준 가속도 (rx: 오른쪽 +, rz: 화면 아래쪽=내 쪽 +)
-const mo={rx:0,rz:0,ok:false,grav:null};
-addEventListener('devicemotion',e=>{
-  let x,y,z; const a=e.acceleration;
-  if(a&&a.x!=null){x=a.x;y=a.y;z=a.z;}
-  else{const g=e.accelerationIncludingGravity; if(!g||g.x==null) return;
-    if(!mo.grav) mo.grav={x:g.x,y:g.y,z:g.z};
-    mo.grav.x+=(g.x-mo.grav.x)*.06; mo.grav.y+=(g.y-mo.grav.y)*.06; mo.grav.z+=(g.z-mo.grav.z)*.06;
-    x=g.x-mo.grav.x; y=g.y-mo.grav.y; z=g.z-mo.grav.z;}
-  const b=(ori?ori.b:0)*Math.PI/180;   // 폰을 세운 각도만큼 앞뒤 방향을 보정
-  mo.rx=x; mo.rz=-y*Math.cos(b)+z*Math.sin(b); mo.ok=true;
-});
-let ctrl='mix'; try{ctrl=localStorage.getItem('pole-ctrl')||'mix'}catch(e){}
-$('ctrl').value=ctrl; $('ctrl').onchange=()=>{ctrl=$('ctrl').value;try{localStorage.setItem('pole-ctrl',ctrl)}catch(e){}};
-$('ctrl').addEventListener('pointerdown',e=>e.stopPropagation());
 addEventListener('pointerdown',e=>{if(state!=='play')return;if(tapOb(e.clientX,e.clientY))return;touchStart={x:e.clientX,y:e.clientY};});
 addEventListener('pointermove',e=>{if(!touchStart)return;touchVec={x:e.clientX-touchStart.x,y:e.clientY-touchStart.y};});
 addEventListener('pointerup',()=>{touchStart=null;touchVec={x:0,y:0};});
@@ -356,7 +341,6 @@ const MAXT=0.75; // 최대 기울기 입력(rad) — 작은 기울기 반응은 
 function readTilt(){
   // 반환: 쟁반 기울기 φ (x: 오른쪽 내려감 +, z: 화면 아래쪽 내려감 +)
   if(gotOri&&ori&&base){
-    if(ctrl==='move') return {x:0,z:0};
     let gx=(ori.g-base.g), bz=(ori.b-base.b);
     const d=Math.PI/180;
     return {x:clamp(gx*d,-MAXT,MAXT), z:clamp(bz*d,-MAXT,MAXT)};
@@ -378,14 +362,11 @@ $('best').textContent='최고 '+best.toFixed(1)+'초';
 async function begin(){
   $('start').hidden=true; $('over').hidden=true;
   $('start').style.display='none'; $('over').style.display='none';
-  const ps=[];   // 기울기·움직임 권한을 같은 터치 안에서 한꺼번에 요청
-  try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission) ps.push(DeviceOrientationEvent.requestPermission()); }catch(e){}
-  try{ if(typeof DeviceMotionEvent!=='undefined'&&DeviceMotionEvent.requestPermission) ps.push(DeviceMotionEvent.requestPermission()); }catch(e){}
-  try{ await Promise.allSettled(ps); }catch(e){}
+  try{ if(typeof DeviceOrientationEvent!=='undefined'&&DeviceOrientationEvent.requestPermission)
+        await DeviceOrientationEvent.requestPermission(); }catch(e){}
   try{ wake=await navigator.wakeLock.request('screen'); }catch(e){}
   setTimeout(()=>{ base=ori?{...ori}:null;
-    const CN={mix:'혼합 조작',tilt:'기울기 조작',move:'움직임 조작'}[ctrl];
-    $('mode').textContent=!gotOri?'기울기 센서 없음 · 손가락 드래그로 조작':CN+(ctrl!=='tilt'&&!mo.ok?' · 움직임 센서 없음':'');
+    $('mode').textContent=gotOri?'기울기 조작':'기울기 센서 없음 · 손가락 드래그로 조작';
   },250);
   reset(); state='play'; document.body.classList.add('playing');
 }
@@ -393,7 +374,6 @@ function reset(){
   clearObs(); popped=0; obNext=0; $('pop').textContent='';
   t=0; th={x:(Math.random()-.5)*.04,z:(Math.random()-.5)*.04}; om={x:0,z:0};
   wind={x:0,z:0,w:0,left:0,next:Math.random()*2}; fall=null; streaks=[];
-  mf={x:0,z:0}; mv={x:0,z:0}; mq=1; mAct=0; mU=null;
   bendPole(th.x,th.z); placeMan(); camPos.copy(top).add(camOffset);
 }
 $('go').onclick=begin; $('again').onclick=begin;
@@ -428,30 +408,6 @@ function step(now){
   draw(dt);
   requestAnimationFrame(step);
 }
-// ---------- 움직임 → 밑동 이동 ----------
-// 빠르게 민 것만 반영(느린 되돌림은 무시), 멈추면 속도 0으로 리셋 → 10cm쯤 밀면 기울기 약 1.0만큼 되돌아옴
-const MG=10, MDZ=.3, MCAP=.8;
-let mf={x:0,z:0}, mv={x:0,z:0}, mq=1, mAct=0, mU=null;
-function motionShift(dt){
-  if(ctrl==='tilt'||!mo.ok) return null;
-  const lp=Math.min(1,dt/.04); mf.x+=(mo.rx-mf.x)*lp; mf.z+=(mo.rz-mf.z)*lp;
-  const m=Math.hypot(mf.x,mf.z);
-  if(m<MDZ){ mq+=dt; }
-  else{
-    if(mq>.3){ const tm=Math.hypot(th.x,th.z); mU=tm>.15?{x:th.x/tm,z:th.z/tm}:null; }   // 새 동작 시작: 그때 기운 방향 기억
-    mq=0; const k=(m-MDZ)/m; mv.x+=mf.x*k*dt; mv.z+=mf.z*k*dt;
-  }
-  if(mq>.12){ const k=Math.exp(-dt/.08); mv.x*=k; mv.z*=k; }   // 멈췄으면 속도 리셋 (넘쳐서 반대로 계속 가는 것 방지)
-  const vm=Math.hypot(mv.x,mv.z); if(vm>MCAP){ mv.x*=MCAP/vm; mv.z*=MCAP/vm; }
-  if(vm>.03) mAct=.6;
-  // 폰이 오른쪽으로 가면 장대는 왼쪽으로 (밑동이 쓰러지는 쪽 아래로 들어감)
-  const sx=-MG*mv.x*dt, sz=-MG*mv.z*dt;
-  const d={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
-  // 반동 보정: 한 번 크게 밀어 중심을 넘어가면, 넘어간 만큼의 35%만 반영
-  if(mU){ const p=d.x*mU.x+d.z*mU.z, cur=th.x*mU.x+th.z*mU.z, nx=cur+p;
-    if(p<0&&nx<0){ const over=Math.min(-nx,-p)*.65; d.x+=mU.x*over; d.z+=mU.z*over; } }
-  return d;
-}
 function physics(dt){
   t+=dt;
   const k=.45+Math.min(t,120)*.0013;           // 휘청이는 힘, 아주 천천히 강해짐 (최대 .6)
@@ -475,14 +431,9 @@ function physics(dt){
   // 조작·바람은 화면 기준 → 땅 위 방향으로 바꿈 (시점이 바뀌어도 기울인 화면 쪽으로 휨)
   const sx=c*phi.x+wx, sz=c*phi.z+wz;
   const f={x:sx*scrR.x+sz*scrD.x, z:sx*scrR.z+sz*scrD.z};
-  const ms=motionShift(dt);
-  mAct=Math.max(0,mAct-dt);
-  // 움직인 직후 중심 근처에선 남은 흔들림을 더 잡아줌 (반대로 넘어가는 것 방지)
-  const cat=mAct>0&&Math.hypot(th.x,th.z)<.7?2.5:0;
   for(const a of ['x','z']){
-    const acc=k*fallF(th[a]) + f[a] + (Math.random()-.5)*jit - (damp+cat)*om[a];
+    const acc=k*fallF(th[a]) + f[a] + (Math.random()-.5)*jit - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt;
-    if(ms) th[a]+=ms[a];
   }
   if(Math.hypot(th.x,th.z)>LIMIT) gameOver();
   $('time').textContent=t.toFixed(1);
@@ -528,6 +479,21 @@ function draw(){
     g2.strokeStyle='rgba(255,255,255,'+((s.a||.35)*s.life)+')';
     g2.beginPath(); g2.moveTo(s.x,s.y); g2.lineTo(s.x-s.dx*s.l,s.y-s.dy*s.l); g2.stroke();
   }
+  rings();
+}
+// ---------- 중심 표시: 캐릭터를 중심으로 동심원 두 개 (안쪽 = 한계의 절반, 바깥 = 떨어지는 한계), 점 = 지금 기운 방향·정도 ----------
+const RO=64, RI=RO/2, rv=new THREE.Vector3();
+function rings(){
+  if(state!=='play'&&state!=='ready') return;
+  rv.copy(man.position); rv.y+=.6; rv.project(camera);
+  const cr=$('c').getBoundingClientRect(), cx=cr.left+(rv.x+1)/2*cr.width, cy=cr.top+(1-rv.y)/2*cr.height;
+  const lx=(th.x*scrR.x+th.z*scrR.z)/LIMIT, ly=(th.x*scrD.x+th.z*scrD.z)/LIMIT;   // 화면 기준 기울기, 1 = 한계
+  const m=Math.hypot(lx,ly), k=m>1?1/m:1, dx=cx+lx*k*RO, dy=cy+ly*k*RO;
+  g2.lineWidth=1.5;
+  g2.strokeStyle='rgba(244,244,246,.22)'; g2.beginPath(); g2.arc(cx,cy,RO,0,Math.PI*2); g2.stroke();
+  g2.strokeStyle='rgba(244,244,246,.38)'; g2.beginPath(); g2.arc(cx,cy,RI,0,Math.PI*2); g2.stroke();
+  g2.fillStyle=m>.5?'#ff8a3d':'rgba(244,244,246,.9)';
+  g2.beginPath(); g2.arc(dx,dy,5,0,Math.PI*2); g2.fill();
 }
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'&&state==='play'){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
