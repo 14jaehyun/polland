@@ -8,15 +8,15 @@
   "name": "Chongqing"
  },
  {
-  "id": "seoul",
-  "name": "Seoul"
- },
- {
   "id": "shibuya",
   "name": "Shibuya"
  },
  {
   "id": "bangkok",
   "name": "Bangkok"
+ },
+ {
+  "id": "seoul",
+  "name": "Seoul"
  }
 ]
