@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.30 · city_play</div>
+<div id="ver">v0.31 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -483,9 +483,18 @@ function draw(dt){
 }
 // ---------- 위험 연출: 5°를 넘으면 화면 가장자리가 확 붉어지고, 심장 박동처럼 맥박침 ----------
 // 5°에서 바로 또렷하게 시작, 10°에 가까울수록 진해지고 박동이 빨라짐. 방향은 알려주지 않음(사방 똑같이)
-let dz=0, dph=0;
+let dz=0, dph=0, gz=0;
 function danger(dt){
   const deg=Math.hypot(tilt.x,tilt.z)*180/Math.PI;
+  // 중심(0.5° 이내)에 맞으면 가장자리에 초록 음영 (부드럽게 들어오고 빠짐)
+  const gw=state==='play'&&deg<.5?1:0;
+  gz+=(gw-gz)*Math.min(1,dt*(gw>gz?10:6));
+  if(gz>.005){
+    const cr=$('c').getBoundingClientRect(), W=cr.width, H=cr.height, cx=cr.left+W/2, cy=cr.top+H/2;
+    const gg=g2.createRadialGradient(cx,cy,Math.max(W,H)*.34,cx,cy,Math.max(W,H)*.7);
+    gg.addColorStop(0,'rgba(20,200,90,0)'); gg.addColorStop(.6,'rgba(30,210,100,'+(gz*.22)+')'); gg.addColorStop(1,'rgba(10,170,70,'+(gz*.45)+')');
+    g2.fillStyle=gg; g2.fillRect(cr.left,cr.top,W,H);
+  }
   let w=0; if(state==='play'&&deg>5){ const u=Math.min(1,(deg-5)/(LIMIT_DEG-5)); w=.45+.55*u*u*(3-2*u); }   // 5°에서 바로 45%로 켜짐
   dz+=(w-dz)*Math.min(1,dt*(w>dz?14:4));               // 켜질 땐 즉시, 꺼질 땐 조금 천천히
   if(dz<.005) return;
