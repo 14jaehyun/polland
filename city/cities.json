@@ -18,5 +18,9 @@
  {
   "id": "seoul",
   "name": "Seoul"
+ },
+ {
+  "id": "chicago",
+  "name": "Chicago"
  }
 ]
