@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.46 · city_play</div>
+<div id="ver">v0.47 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -445,6 +445,9 @@ function physics(dt){
   // 조작·바람은 화면 기준 → 땅 위 방향으로 바꿈 (시점이 바뀌어도 기울인 화면 쪽으로 휨)
   const px=c*phi.x, pz=c*phi.z;
   const f={x:px*scrR.x+pz*scrD.x, z:px*scrR.z+pz*scrD.z};          // 내 조작
+  // 위기 보조: 6°부터 중심 쪽으로 되돌리는 힘이 커져서 9°에선 2배 (폰을 12~16°만 꺾어도 9° 넘은 상태에서 돌아옴)
+  { const dg0=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI;
+    if(dg0>6&&f.x*th.x+f.z*th.z<0){ const b=dg0>=9?2:1+(dg0-6)/3; f.x*=b; f.z*=b; } }
   const wf={x:wx*scrR.x+wz*scrD.x, z:wx*scrR.z+wz*scrD.z};          // 바람
   // 7°부터 기울어지는 속도가 점점 느려져서 10°에선 1.5배 느리게(속도 2/3) (위기에서 반응할 시간). 바깥으로 기울 때만, 되돌아올 땐 원래 속도
   const dg=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI, outward=th.x*om.x+th.z*om.z>0;
