@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.27 · city_play</div>
+<div id="ver">v0.28 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -443,12 +443,12 @@ function physics(dt){
 function placeMan(){ man.position.set(0,TOP,0).add(new THREE.Vector3(0,CAP,0).applyQuaternion(qA)); man.quaternion.copy(qA); }
 const qT=new THREE.Quaternion(), eT=new THREE.Euler(), offR=new THREE.Vector3(), scrP=new THREE.Vector3();
 const qI=new THREE.Quaternion(), qV=new THREE.Quaternion();
-const VIS=3;
+const VIS=3, VIS0=5;
 function followCam(dt){
   // 카메라는 쉬는 자리에 고정, 판만 축 PV를 중심으로 장대 기울기의 반대로 회전
   camera.position.copy(top).add(camOffset); camera.quaternion.copy(camQuat);
-  // 보이는 회전: 10°까지는 VIS배, 그 너머(한도를 넓힌 도시)는 1배씩만 더해서 화면이 너무 돌지 않게
-  const tm=Math.hypot(tilt.x,tilt.z), T10=10*Math.PI/180, vm=tm<=T10?tm*VIS:T10*VIS+(tm-T10), sc=tm>1e-6?vm/tm:VIS;
+  // 보이는 회전: 막 기울 때는 5배, 10°에선 3배로 부드럽게 줄어듦(초반 기울기를 크게 보여줌), 그 너머(한도를 넓힌 도시)는 1배씩만 더함
+  const tm=Math.hypot(tilt.x,tilt.z), T10=10*Math.PI/180, vm=tm<=T10?tm*(VIS0-(VIS0-VIS)*tm/T10):T10*VIS+(tm-T10), sc=tm>1e-6?vm/tm:VIS0;
   eT.set(tilt.z*sc,0,-tilt.x*sc); qT.setFromEuler(eT); PG.quaternion.copy(qT).invert();   // 보이는 회전만 VIS배 (물리는 그대로)
 }
 function pose(flail){
@@ -479,21 +479,6 @@ function draw(){
     g2.strokeStyle='rgba(255,255,255,'+((s.a||.35)*s.life)+')';
     g2.beginPath(); g2.moveTo(s.x,s.y); g2.lineTo(s.x-s.dx*s.l,s.y-s.dy*s.l); g2.stroke();
   }
-  rings();
-}
-// ---------- 중심 표시: 캐릭터를 중심으로 동심원 두 개 (안쪽 = 한계의 절반, 바깥 = 떨어지는 한계), 점 = 지금 기운 방향·정도 ----------
-const RO=64, RI=RO/2, rv=new THREE.Vector3();
-function rings(){
-  if(state!=='play'&&state!=='ready') return;
-  rv.copy(man.position); rv.y+=.6; rv.project(camera);
-  const cr=$('c').getBoundingClientRect(), cx=cr.left+(rv.x+1)/2*cr.width, cy=cr.top+(1-rv.y)/2*cr.height;
-  const lx=(th.x*scrR.x+th.z*scrR.z)/LIMIT, ly=(th.x*scrD.x+th.z*scrD.z)/LIMIT;   // 화면 기준 기울기, 1 = 한계
-  const m=Math.hypot(lx,ly), k=m>1?1/m:1, dx=cx+lx*k*RO, dy=cy+ly*k*RO;
-  g2.lineWidth=1.5;
-  g2.strokeStyle='rgba(244,244,246,.22)'; g2.beginPath(); g2.arc(cx,cy,RO,0,Math.PI*2); g2.stroke();
-  g2.strokeStyle='rgba(244,244,246,.38)'; g2.beginPath(); g2.arc(cx,cy,RI,0,Math.PI*2); g2.stroke();
-  g2.fillStyle=m>.5?'#ff8a3d':'rgba(244,244,246,.9)';
-  g2.beginPath(); g2.arc(dx,dy,5,0,Math.PI*2); g2.fill();
 }
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'&&state==='play'){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
