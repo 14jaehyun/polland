@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.45 · city_play</div>
+<div id="ver">v0.46 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -454,9 +454,9 @@ function physics(dt){
     const acc=(k*fallF(th[a]) + wf[a] + (Math.random()-.5)*jit)*slow + f[a] - damp*om[a];
     om[a]+=acc*dt; th[a]+=om[a]*dt*slow;
   }
-  // 9°를 넘으면 0.6초 유예: 그 안에 9° 안으로 돌아오면 생존, 13°를 넘으면 즉시 떨어짐
+  // 9°를 넘으면 0.6초 유예. 유예 시간은 바깥으로 기우는 동안만 흐르고, 되돌아오는 중엔 멈춤 (13°를 넘으면 즉시 떨어짐)
   const dgn=Math.atan(Math.hypot(th.x,th.z)*SWAY/TOP)*180/Math.PI;
-  if(dgn>13) gameOver(); else if(dgn>9){ over+=dt; if(over>.6) gameOver(); } else over=0;
+  if(dgn>13) gameOver(); else if(dgn>9){ if(th.x*om.x+th.z*om.z>0) over+=dt; if(over>.6) gameOver(); } else over=0;
   $('time').textContent=t.toFixed(1);
   bendPole(th.x,th.z); placeMan(); pose(1);
   followCam(dt);
