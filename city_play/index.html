@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.49 · city_play</div>
+<div id="ver">v0.50 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -278,15 +278,19 @@ const bitGeo=new THREE.TetrahedronGeometry(.14,0);
 let obs=[], bits=[], popped=0, obNext=0; const HIT=2.1;
 function spawnOb(){
   // 화면 기준 각도 90°(위)~180°(왼쪽): 위와 왼쪽에서만 나옴
-  const a=(90+Math.random()*90)*Math.PI/180, R=cv.dist*1.6, ca=Math.cos(a), sa=Math.sin(a);
+  const a=(90+Math.random()*90)*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a), hy=top.y+1+Math.random()*2.5;
+  // 출발점: 그 방향으로 화면 끝 바로 바깥 (어느 방향이든 화면에 들어온 뒤 맞기까지 시간이 같게)
+  const at=r=>new THREE.Vector3(top.x+(ca*scrR.x-sa*scrD.x)*r, hy, top.z+(ca*scrR.z-sa*scrD.z)*r);
+  let lo=1,hi=200; for(let i=0;i<24;i++){const mid=(lo+hi)/2,v=at(mid).project(camera); if(Math.abs(v.x)>1.02||Math.abs(v.y)>1.02||v.z>1) hi=mid; else lo=mid;}
   const m=new THREE.Mesh(obGeo,obMat);
-  m.position.set(top.x+(ca*scrR.x-sa*scrD.x)*R, top.y+1+Math.random()*2.5, top.z+(ca*scrR.z-sa*scrD.z)*R);
-  const sp=(2.6+Math.random()*1.8+Math.min(t,120)*.012)*R/16*1.5;   // 속도 1.5배
+  m.position.copy(at(hi*1.06));
+  const VT=.4+Math.random()*.6;   // 화면에 보이는 시간 0.4~1초 랜덤
   // 곡선 경로: 출발점 → (옆으로 휘는 중간점) → 캐릭터. 좌우 어느 쪽으로 휠지는 랜덤
   const P0=m.position.clone(), P2=new THREE.Vector3(man.position.x,man.position.y+1.1,man.position.z);
   const dir=P2.clone().sub(P0), L=dir.length(), side=new THREE.Vector3(-dir.z,0,dir.x).normalize();
   const P1=P0.clone().lerp(P2,.5).addScaledVector(side,(Math.random()<.5?-1:1)*L*(.28+Math.random()*.2)).add(new THREE.Vector3(0,L*.08,0));
-  obs.push({m,sp,P0,P1,P2,s:0,len:L*1.15,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
+  const len=L*1.15, sp=len/VT;
+  obs.push({m,sp,P0,P1,P2,s:0,len,spin:new THREE.Vector3(Math.random(),Math.random(),Math.random())});
   scene.add(m);
 }
 function burst(p,n,col){
@@ -301,7 +305,8 @@ function clearObs(){ for(const o of obs) scene.remove(o.m); obs=[]; }
 function updateObs(dt){
   if(state==='play'&&t>15){
     obNext-=dt;
-    if(obNext<=0){ spawnOb(); obNext=(Math.max(1.4,4.5-t*.012)+Math.random()*2.5)*1.5; }   // 빈도 1.5배 낮춤
+    // 간격 랜덤: 평균은 처음 8.6초 → 시간이 지나며 최소 3.5초까지 줄고, 매번 평균의 0.3~2.2배 사이로 들쭉날쭉 (몰려오기도, 한참 안 오기도)
+    if(obNext<=0){ spawnOb(); const mean=Math.max(3.5,8.6-t*.02); obNext=mean*Math.min(2.2,Math.max(.3,-Math.log(1-Math.random()))); }
   }
   const tan=new THREE.Vector3();
   for(let k=obs.length-1;k>=0;k--){
