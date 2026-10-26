@@ -65,7 +65,7 @@ button:active{transform:scale(.97)}
 <div class="hud"><div id="time">0.0</div><div id="best">최고 0.0초</div><div id="pop"></div></div>
 <button id="dir" type="button"></button>
 <div id="mode"></div>
-<div id="ver">v0.29 · city_play</div>
+<div id="ver">v0.30 · city_play</div>
 
 <div class="tog"><select id="city" aria-label="도시"></select></div>
 <div class="ov" id="start">
@@ -481,25 +481,25 @@ function draw(dt){
   }
   danger(dt);
 }
-// ---------- 위험 연출: 7°를 넘으면 화면 가장자리부터 붉게 물들고, 심장 박동처럼 맥박침 ----------
-// 10°에 가까울수록 진해지고 박동이 빨라짐. 기운 쪽 가장자리가 더 붉음. 갑자기 켜지지 않게 부드럽게 따라감
+// ---------- 위험 연출: 5°를 넘으면 화면 가장자리가 확 붉어지고, 심장 박동처럼 맥박침 ----------
+// 5°에서 바로 또렷하게 시작, 10°에 가까울수록 진해지고 박동이 빨라짐. 방향은 알려주지 않음(사방 똑같이)
 let dz=0, dph=0;
 function danger(dt){
   const deg=Math.hypot(tilt.x,tilt.z)*180/Math.PI;
-  let w=state==='play'?Math.min(1,Math.max(0,(deg-7)/(LIMIT_DEG-7))):0; w=w*w*(3-2*w);
-  dz+=(w-dz)*Math.min(1,dt*(w>dz?8:3));                // 켜질 땐 빠르게, 꺼질 땐 천천히
+  let w=0; if(state==='play'&&deg>5){ const u=Math.min(1,(deg-5)/(LIMIT_DEG-5)); w=.45+.55*u*u*(3-2*u); }   // 5°에서 바로 45%로 켜짐
+  dz+=(w-dz)*Math.min(1,dt*(w>dz?14:4));               // 켜질 땐 즉시, 꺼질 땐 조금 천천히
   if(dz<.005) return;
   dph+=dt*(1.1+dz*1.6)*Math.PI*2;                         // 박동: 분당 약 66 → 160
   const beat=Math.pow(Math.max(0,Math.sin(dph)),6)*.6+Math.pow(Math.max(0,Math.sin(dph-.9)),8)*.3;   // 쿵-쿵
   const cr=$('c').getBoundingClientRect(), W=cr.width, H=cr.height;
-  const lx=(th.x*scrR.x+th.z*scrR.z), ly=(th.x*scrD.x+th.z*scrD.z), lm=Math.hypot(lx,ly)||1;
-  const cx=cr.left+W/2-lx/lm*W*.22*dz, cy=cr.top+H/2-ly/lm*H*.14*dz;   // 중심을 반대로 밀어서 기운 쪽이 더 붉게
-  const r0=Math.max(W,H)*(.42-.12*dz), r1=Math.max(W,H)*.78;
-  const a=Math.min(.85,dz*(.42+beat*.35));
+  const cx=cr.left+W/2, cy=cr.top+H/2;
+  const r0=Math.max(W,H)*(.36-.14*dz), r1=Math.max(W,H)*.7;
+  const a=Math.min(.95,dz*(.6+beat*.4));
   const gr=g2.createRadialGradient(cx,cy,r0,cx,cy,r1);
   gr.addColorStop(0,'rgba(150,0,8,0)'); gr.addColorStop(.55,'rgba(170,4,12,'+(a*.55)+')'); gr.addColorStop(1,'rgba(110,0,6,'+a+')');
   g2.fillStyle=gr; g2.fillRect(cr.left,cr.top,W,H);
-  g2.fillStyle='rgba(120,0,10,'+(dz*.1+beat*dz*.06)+')'; g2.fillRect(cr.left,cr.top,W,H);   // 화면 전체도 살짝 붉은 기
+  g2.fillStyle='rgba(140,0,10,'+(dz*.16+beat*dz*.12)+')'; g2.fillRect(cr.left,cr.top,W,H);   // 화면 전체도 붉은 기
+  g2.strokeStyle='rgba(255,40,40,'+(dz*(.35+beat*.5))+')'; g2.lineWidth=6; g2.strokeRect(cr.left+3,cr.top+3,W-6,H-6);   // 테두리 붉은 띠가 박동에 맞춰 번쩍
 }
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'&&state==='play'){try{wake=await navigator.wakeLock.request('screen')}catch(e){}}
